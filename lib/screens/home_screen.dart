@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             height: 40,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [AppTheme.primaryPurple, AppTheme.lightPurple],
+                                colors: [AppTheme.primaryBlue, AppTheme.primaryBlue],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
@@ -141,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   else if (isConnecting)
                                     AppTheme.warningOrange.withOpacity(0.2)
                                   else
-                                    AppTheme.primaryPurple.withOpacity(0.2),
+                                    AppTheme.primaryBlue.withOpacity(0.2),
                                   AppTheme.backgroundColor,
                                 ],
                                 center: Alignment.center,
@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                           ? [AppTheme.successGreen, const Color(0xFF00B050)]
                                           : isConnecting
                                               ? [AppTheme.warningOrange, AppTheme.warningOrange.withOpacity(0.7)]
-                                              : [AppTheme.primaryPurple, AppTheme.darkPurple],
+                                              : [AppTheme.primaryBlue, AppTheme.primaryBlue],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       BoxShadow(
                                         color: isConnected
                                             ? AppTheme.successGreen.withOpacity(0.3)
-                                            : AppTheme.primaryPurple.withOpacity(0.3),
+                                            : AppTheme.primaryBlue.withOpacity(0.3),
                                         blurRadius: 20,
                                         spreadRadius: 5,
                                       ),
@@ -410,14 +410,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryPurple.withOpacity(0.2),
+                          color: AppTheme.primaryBlue.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           s.protocol == ProtocolType.hysteria
                               ? Icons.flash_on
                               : Icons.wifi,
-                          color: AppTheme.primaryPurple,
+                          color: AppTheme.primaryBlue,
                           size: 20,
                         ),
                       ),

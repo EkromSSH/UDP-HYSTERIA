@@ -63,7 +63,7 @@ class _AddServerScreenState extends State<AddServerScreen> {
         title: Text(isEditing ? 'Edit Configuration' : 'Add Configuration'),
       ),
       body: Container(
-        color: const Color(0xFF0A0A0A),
+        color: AppTheme.backgroundColor,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -74,23 +74,23 @@ class _AddServerScreenState extends State<AddServerScreen> {
                 // Protocol (display only)
                 _label('Protocol'),
                 const SizedBox(height: 6),
-                _darkBox(
+                _whiteBox(
                   child: Row(
                     children: [
-                      const Icon(Icons.flash_on, color: Colors.white54, size: 18),
+                      const Icon(Icons.flash_on, color: AppTheme.textSecondary, size: 18),
                       const SizedBox(width: 10),
                       const Text(
                         'UDP => HYSTERIA',
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                        style: TextStyle(color: AppTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w500),
                       ),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: AppTheme.primaryBlue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('UDP', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                        child: const Text('UDP', style: TextStyle(color: AppTheme.primaryBlue, fontSize: 11)),
                       ),
                     ],
                   ),
@@ -113,7 +113,7 @@ class _AddServerScreenState extends State<AddServerScreen> {
                   ctrl: _authCtrl,
                   obscure: !_showAuth,
                   suffix: IconButton(
-                    icon: Icon(_showAuth ? Icons.visibility_off : Icons.visibility, color: Colors.white38, size: 20),
+                    icon: Icon(_showAuth ? Icons.visibility_off : Icons.visibility, color: AppTheme.textSecondary, size: 20),
                     onPressed: () => setState(() => _showAuth = !_showAuth),
                   ),
                 ),
@@ -150,21 +150,20 @@ class _AddServerScreenState extends State<AddServerScreen> {
                   child: ElevatedButton(
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.1),
+                      backgroundColor: AppTheme.primaryBlue,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.white.withOpacity(0.05),
-                      disabledForegroundColor: Colors.white38,
+                      disabledBackgroundColor: AppTheme.primaryBlue.withOpacity(0.5),
+                      disabledForegroundColor: Colors.white60,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
-                        side: BorderSide(color: Colors.white.withOpacity(0.15)),
                       ),
                     ),
                     child: _saving
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : const Text('Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
@@ -184,7 +183,7 @@ class _AddServerScreenState extends State<AddServerScreen> {
       child: Text(
         text,
         style: const TextStyle(
-          color: Colors.white54,
+          color: AppTheme.textSecondary,
           fontSize: 13,
           fontWeight: FontWeight.w500,
           letterSpacing: 0.3,
@@ -193,13 +192,13 @@ class _AddServerScreenState extends State<AddServerScreen> {
     );
   }
 
-  Widget _darkBox({required Widget child}) {
+  Widget _whiteBox({required Widget child}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: AppTheme.borderColor),
       ),
       child: child,
     );
@@ -217,31 +216,31 @@ class _AddServerScreenState extends State<AddServerScreen> {
       controller: ctrl,
       obscureText: obscure,
       keyboardType: numeric ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: Colors.white, fontSize: 15),
+      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+        hintStyle: TextStyle(color: AppTheme.textSecondary.withOpacity(0.5)),
+        labelStyle: TextStyle(color: AppTheme.textSecondary),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.04),
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         suffixIcon: suffix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          borderSide: const BorderSide(color: AppTheme.borderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+          borderSide: const BorderSide(color: AppTheme.borderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          borderSide: const BorderSide(color: AppTheme.primaryBlue),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFFF4444)),
+          borderSide: const BorderSide(color: AppTheme.errorRed),
         ),
       ),
       validator: (v) {

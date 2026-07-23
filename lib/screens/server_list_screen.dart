@@ -77,7 +77,7 @@ class _ServerListScreenState extends State<ServerListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Connecting to ${server.name}...'),
-          backgroundColor: AppTheme.primaryPurple,
+          backgroundColor: AppTheme.primaryBlue,
         ),
       );
     }
@@ -140,13 +140,13 @@ class _ServerListScreenState extends State<ServerListScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppTheme.primaryPurple.withOpacity(0.1),
+                color: AppTheme.primaryBlue.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.dns_outlined,
                 size: 64,
-                color: AppTheme.primaryPurple,
+                color: AppTheme.primaryBlue,
               ),
             ),
             const SizedBox(height: 24),

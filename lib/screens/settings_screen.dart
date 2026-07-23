@@ -60,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() => _autoConnect = v);
                 _storage?.setAutoConnect(v);
               },
-              activeColor: AppTheme.primaryPurple,
+              activeColor: AppTheme.primaryBlue,
             ),
           ),
           _SettingsTile(
@@ -73,7 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() => _startOnBoot = v);
                 _storage?.setStartOnBoot(v);
               },
-              activeColor: AppTheme.primaryPurple,
+              activeColor: AppTheme.primaryBlue,
             ),
           ),
           const Divider(color: AppTheme.borderColor),
@@ -144,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                                     'EkromSSH',
                                     style: TextStyle(
-                                      color: AppTheme.primaryPurple,
+                                      color: AppTheme.primaryBlue,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -264,7 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 48,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [AppTheme.primaryPurple, AppTheme.lightPurple],
+            colors: [AppTheme.primaryBlue, AppTheme.primaryBlue],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -306,7 +306,7 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryPurple),
+      leading: Icon(icon, color: AppTheme.primaryBlue),
       title: Text(title, style: const TextStyle(color: Colors.white)),
       subtitle: Text(subtitle, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
       trailing: trailing,
@@ -328,7 +328,7 @@ class _SectionHeader2 extends StatelessWidget {
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: AppTheme.primaryPurple,
+          color: AppTheme.primaryBlue,
           letterSpacing: 1.2,
         ),
       ),

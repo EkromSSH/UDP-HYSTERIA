@@ -28,7 +28,7 @@ class EkromSSHApp extends StatelessWidget {
       child: MaterialApp(
         title: 'EkromSSH',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
+        theme: AppTheme.lightTheme,
         home: const MainShell(),
       ),
     );

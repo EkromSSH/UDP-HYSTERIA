@@ -9,7 +9,7 @@ class ProtocolBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = color ?? AppTheme.primaryPurple;
+    final bgColor = color ?? AppTheme.primaryBlue;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -208,8 +208,8 @@ class ServerTile extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                isActive ? AppTheme.successGreen : AppTheme.primaryPurple,
-                isActive ? AppTheme.successGreen.withOpacity(0.7) : AppTheme.darkPurple,
+                isActive ? AppTheme.successGreen : AppTheme.primaryBlue,
+                isActive ? AppTheme.successGreen.withOpacity(0.7) : AppTheme.primaryBlue,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,

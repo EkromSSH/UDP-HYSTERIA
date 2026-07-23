@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // EkromSSH Brand Colors — Purple theme
-  static const Color primaryPurple = Color(0xFF6A0DAD);
-  static const Color darkPurple = Color(0xFF4A0072);
-  static const Color lightPurple = Color(0xFF9C27B0);
-  static const Color accentPurple = Color(0xFFE1BEE7);
-  static const Color backgroundColor = Color(0xFF0D0D1A);
-  static const Color surfaceColor = Color(0xFF1A1A2E);
-  static const Color cardColor = Color(0xFF16213E);
-  static const Color successGreen = Color(0xFF00E676);
-  static const Color errorRed = Color(0xFFFF1744);
-  static const Color warningOrange = Color(0xFFFF9100);
-  static const Color textPrimary = Color(0xFFFFFFFF);
-  static const Color textSecondary = Color(0xFFB0B0B0);
-  static const Color borderColor = Color(0xFF2A2A4A);
+  // Clean white theme — minimal, professional
+  static const Color primaryBlue = Color(0xFF1976D2);
+  static const Color backgroundColor = Color(0xFFF5F5F5);
+  static const Color surfaceColor = Color(0xFFFFFFFF);
+  static const Color cardColor = Color(0xFFFFFFFF);
+  static const Color successGreen = Color(0xFF4CAF50);
+  static const Color errorRed = Color(0xFFE53935);
+  static const Color warningOrange = Color(0xFFFF9800);
+  static const Color textPrimary = Color(0xFF212121);
+  static const Color textSecondary = Color(0xFF757575);
+  static const Color borderColor = Color(0xFFE0E0E0);
 
-  static ThemeData get darkTheme {
+  static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: ColorScheme.dark(
-        primary: primaryPurple,
-        secondary: lightPurple,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.light(
+        primary: primaryBlue,
+        secondary: primaryBlue,
         surface: surfaceColor,
         error: errorRed,
         onPrimary: Colors.white,
@@ -31,9 +28,9 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: backgroundColor,
       appBarTheme: const AppBarTheme(
-        backgroundColor: surfaceColor,
+        backgroundColor: Colors.white,
         foregroundColor: textPrimary,
-        elevation: 0,
+        elevation: 0.5,
         centerTitle: true,
         titleTextStyle: TextStyle(
           color: textPrimary,
@@ -43,15 +40,15 @@ class AppTheme {
       ),
       cardTheme: CardTheme(
         color: cardColor,
-        elevation: 4,
+        elevation: 1,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: borderColor, width: 0.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryPurple,
+          backgroundColor: primaryBlue,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
           shape: RoundedRectangleBorder(
@@ -65,33 +62,35 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceColor,
+        fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: primaryPurple, width: 2),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: primaryBlue, width: 1.5),
         ),
-        labelStyle: const TextStyle(color: textSecondary),
+        labelStyle: const TextStyle(color: textSecondary, fontSize: 14),
         hintStyle: const TextStyle(color: textSecondary),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: surfaceColor,
-        selectedItemColor: primaryPurple,
+        backgroundColor: Colors.white,
+        selectedItemColor: primaryBlue,
         unselectedItemColor: textSecondary,
+        elevation: 8,
       ),
       dividerTheme: const DividerThemeData(
         color: borderColor,
         thickness: 0.5,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: cardColor,
+        backgroundColor: Colors.white,
         contentTextStyle: const TextStyle(color: textPrimary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
