@@ -2,7 +2,7 @@ name: Build EkromSSH APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "test" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
