@@ -5,9 +5,13 @@ import 'providers/connection_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/server_list_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/vpn_engine.dart';
+import 'services/storage_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.getInstance();
+  await VpnEngine.initialize();
   runApp(const EkromSSHApp());
 }
 
@@ -19,6 +23,7 @@ class EkromSSHApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ConnectionProvider()),
+        ChangeNotifierProvider(create: (_) => ServerProvider()),
       ],
       child: MaterialApp(
         title: 'EkromSSH',
@@ -40,18 +45,16 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ServerListScreen(),
-    SettingsScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: const [
+          HomeScreen(),
+          ServerListScreen(),
+          SettingsScreen(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

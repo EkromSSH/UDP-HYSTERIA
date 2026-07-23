@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/connection_provider.dart';
 import '../models/server_config.dart';
+import '../services/storage_service.dart';
 import '../widgets/app_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -152,6 +153,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 onTap: () {
                                   if (isConnected || isConnecting) {
                                     provider.disconnect();
+                                  } else {
+                                    _showServerPicker(context);
                                   }
                                 },
                                 child: Container(
@@ -343,67 +346,100 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showServerPicker(BuildContext context) {
-    showModalBottomSheet(
+  void _showServerPicker(BuildContext context) async {
+    final storage = await StorageService.getInstance();
+    final servers = await storage.getServers();
+
+    if (!mounted) return;
+
+    if (servers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add a server first in the Servers tab'),
+          backgroundColor: AppTheme.warningOrange,
+        ),
+      );
+      return;
+    }
+
+    final selected = await showModalBottomSheet<ServerConfig>(
       context: context,
       backgroundColor: AppTheme.surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Consumer<ConnectionProvider>(
-          builder: (ctx, provider, _) {
-            // This should be populated from ServerProvider
-            // For demo, we'll show a placeholder
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Quick Connect',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: AppTheme.textSecondary),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
                   const Text(
-                    'Select a server from your list or add a new one',
-                    style: TextStyle(color: AppTheme.textSecondary),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppTheme.cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Add servers first in the Server tab',
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
+                    'Select Server',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
-            );
-          },
+              const SizedBox(height: 8),
+              const Text(
+                'Choose a server to connect',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: servers.length > 4 ? 300 : servers.length * 72.0,
+                child: ListView.separated(
+                  itemCount: servers.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, color: AppTheme.borderColor),
+                  itemBuilder: (ctx, i) {
+                    final s = servers[i];
+                    return ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryPurple.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          s.protocol == ProtocolType.hysteria
+                              ? Icons.flash_on
+                              : Icons.wifi,
+                          color: AppTheme.primaryPurple,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(s.name, style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(
+                        '${s.host} | ${s.displayProtocol}',
+                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                      ),
+                      onTap: () => Navigator.pop(ctx, s),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
         );
       },
     );
+
+    if (selected != null && mounted) {
+      context.read<ConnectionProvider>().connect(selected);
+    }
   }
 }
