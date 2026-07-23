@@ -141,16 +141,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               children: [
                 Text(
-                  'UDP HYSTERIA VPN',
-                  style: TextStyle(
-                    color: AppTheme.primaryPurple,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Secure • Fast • Reliable',
+                                    'EkromSSH',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryPurple,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Secure Tunnel',
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 32),

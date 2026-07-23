@@ -21,7 +21,7 @@ class UDP HYSTERIAApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ConnectionProvider()),
       ],
       child: MaterialApp(
-        title: 'UDP HYSTERIA VPN',
+        title: 'EkromSSH',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const MainShell(),

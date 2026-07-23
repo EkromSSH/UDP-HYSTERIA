@@ -88,7 +88,7 @@ class EkromVpnService : VpnService() {
         if (isRunning.get()) return
 
         val builder = Builder()
-        builder.setName("UDP HYSTERIA")
+        builder.setName("EkromSSH Hysteria")
         builder.setMtu(1500)
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
@@ -164,7 +164,7 @@ class EkromVpnService : VpnService() {
         if (isRunning.get()) return
 
         val builder = Builder()
-        builder.setName("UDP HYSTERIA SSH WS")
+        builder.setName("EkromSSH SSH WS")
         builder.setMtu(1500)
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
@@ -260,7 +260,7 @@ class EkromVpnService : VpnService() {
         )
 
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("UDP HYSTERIA")
+            .setContentTitle("EkromSSH")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setContentIntent(pendingIntent)

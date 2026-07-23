@@ -1,5 +1,5 @@
-name: udp_hysteria
-description: UDP HYSTERIA - Hysteria + SSH WebSocket VPN Client
+name: ekromssh
+description: EkromSSH VPN - Hysteria + SSH WebSocket Client
 publish_to: 'none'
 version: 1.0.0+1
 

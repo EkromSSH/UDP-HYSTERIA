@@ -9,7 +9,7 @@ class ConfigExportImport {
     final export = {
       'version': 2,
       'exported_at': DateTime.now().toIso8601String(),
-      'app': 'UDP HYSTERIA',
+      'app': 'EkromSSH',
       'website': 'https://github.com/EkromSSH/UDP-HYSTERIA',
       'servers': servers.map((s) => s.toJson()).toList(),
     };
@@ -41,7 +41,7 @@ class ConfigExportImport {
   /// Share config as text (for clipboard or share)
   static String exportAsText(List<ServerConfig> servers) {
     final buffer = StringBuffer();
-    buffer.writeln('=== UDP HYSTERIA Config ===');
+    buffer.writeln('=== EkromSSH Config ===');
     buffer.writeln('Exported: ${DateTime.now()}');
     buffer.writeln('');
 

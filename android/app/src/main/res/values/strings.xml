@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App -->
-    <string name="app_name">UDP HYSTERIA</string>
-    <string name="app_tagline">Fast UDP Tunnel</string>
+    <string name="app_name">EkromSSH</string>
+    <string name="app_tagline">Secure Tunnel</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>
