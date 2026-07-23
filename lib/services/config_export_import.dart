@@ -52,11 +52,11 @@ class ConfigExportImport {
 
       if (server.protocol == ProtocolType.hysteria) {
         buffer.writeln('Port: ${server.hysteriaPort}');
-        buffer.writeln('Password: ${server.hysteriaPassword}');
+        buffer.writeln('AUTH: ${server.hysteriaAuth}');
         if (server.hysteriaObfsPassword.isNotEmpty) {
-          buffer.writeln('Obfs: ${server.hysteriaObfsPassword}');
+          buffer.writeln('OBFS: ${server.hysteriaObfsPassword}');
         }
-        buffer.writeln('ALPN: ${server.hysteriaAlpn}');
+        buffer.writeln('UDP Window: ${server.hysteriaUdpWindow}');
       } else {
         buffer.writeln('SSH Port: ${server.sshPort}');
         buffer.writeln('Username: ${server.sshUsername}');
