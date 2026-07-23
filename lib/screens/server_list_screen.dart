@@ -27,9 +27,8 @@ class _ServerListScreenState extends State<ServerListScreen> {
   Future<void> _loadServers() async {
     final storage = await StorageService.getInstance();
     setState(() {
-      _servers = storage.servers; // We use cached version after load
+      _servers = [];
     });
-    // Actually load from storage
     final loaded = await storage.getServers();
     if (mounted) {
       setState(() {

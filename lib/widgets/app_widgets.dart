@@ -56,7 +56,7 @@ class StatusIndicator extends StatelessWidget {
     } else {
       color = AppTheme.errorRed;
       label = 'Disconnected';
-      icon = Icons.vpn_lock_off;
+      icon = Icons.vpn_lock;
     }
 
     return Row(

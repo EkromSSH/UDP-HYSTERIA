@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/connection_provider.dart';
@@ -28,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     _storage = await StorageService.getInstance();
     setState(() {
-      _autoConnect = _storage!.servers; // Will be fetched properly
+      _autoConnect = false;
     });
     final autoConnect = await _storage!.getAutoConnect();
     final startOnBoot = await _storage!.getStartOnBoot();
