@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../models/server_config.dart';
 import '../services/storage_service.dart';
@@ -58,229 +57,192 @@ class _AddServerScreenState extends State<AddServerScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.editServer != null;
-    final isSsh = widget.editServer?.protocol == ProtocolType.sshWs;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Configuration' : 'Add Configuration'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: _showQrInfo,
-            tooltip: 'Scan QR Code',
-          ),
-        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Protocol selector
-              _buildSectionHeader('Protocol'),
-              const SizedBox(height: 8),
-              _buildProtocolSelector(),
-
-              const SizedBox(height: 20),
-              _buildSectionHeader('Configuration'),
-              const SizedBox(height: 8),
-
-              // Config Name
-              _field(
-                label: 'Config Name',
-                hint: '239',
-                icon: Icons.label_outline,
-                ctrl: _nameCtrl,
-              ),
-              const SizedBox(height: 12),
-
-              // UDP Host
-              _field(
-                label: 'UDP Host',
-                hint: 'app.idavpn.win',
-                icon: Icons.language,
-                ctrl: _hostCtrl,
-              ),
-              const SizedBox(height: 12),
-
-              // UDP Port
-              _field(
-                label: 'UDP Port',
-                hint: '10000-50000',
-                icon: Icons.router,
-                ctrl: _portCtrl,
-              ),
-              const SizedBox(height: 12),
-
-              // AUTH
-              _field(
-                label: 'AUTH',
-                hint: 'ida:ida',
-                icon: Icons.lock_outline,
-                ctrl: _authCtrl,
-                obscure: !_showAuth,
-                suffix: IconButton(
-                  icon: Icon(_showAuth ? Icons.visibility_off : Icons.visibility,
-                      color: AppTheme.textSecondary),
-                  onPressed: () => setState(() => _showAuth = !_showAuth),
+      body: Container(
+        color: const Color(0xFF0A0A0A),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Protocol (display only)
+                _label('Protocol'),
+                const SizedBox(height: 6),
+                _darkBox(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.flash_on, color: Colors.white54, size: 18),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'UDP => HYSTERIA',
+                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text('UDP', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
 
-              // OBFS
-              _field(
-                label: 'OBFS',
-                hint: 'admin',
-                icon: Icons.shuffle,
-                ctrl: _obfsCtrl,
-                obscure: !_showObfs,
-                suffix: IconButton(
-                  icon: Icon(_showObfs ? Icons.visibility_off : Icons.visibility,
-                      color: AppTheme.textSecondary),
-                  onPressed: () => setState(() => _showObfs = !_showObfs),
+                const SizedBox(height: 24),
+
+                _label('Configuration'),
+                const SizedBox(height: 6),
+
+                _field(label: 'Config Name', hint: '239', ctrl: _nameCtrl),
+                const SizedBox(height: 14),
+                _field(label: 'UDP Host', hint: 'app.idavpn.win', ctrl: _hostCtrl),
+                const SizedBox(height: 14),
+                _field(label: 'UDP Port', hint: '10000-50000', ctrl: _portCtrl),
+                const SizedBox(height: 14),
+                _field(
+                  label: 'AUTH',
+                  hint: 'ida:ida',
+                  ctrl: _authCtrl,
+                  obscure: !_showAuth,
+                  suffix: IconButton(
+                    icon: Icon(_showAuth ? Icons.visibility_off : Icons.visibility, color: Colors.white38, size: 20),
+                    onPressed: () => setState(() => _showAuth = !_showAuth),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                _field(
+                  label: 'OBFS',
+                  hint: 'admin',
+                  ctrl: _obfsCtrl,
+                  obscure: !_showObfs,
+                  suffix: IconButton(
+                    icon: Icon(_showObfs ? Icons.visibility_off : Icons.visibility, color: Colors.white38, size: 20),
+                    onPressed: () => setState(() => _showObfs = !_showObfs),
+                  ),
+                ),
+                const SizedBox(height: 14),
 
-              // UP SPEED & DOWN SPEED
-              Row(
-                children: [
-                  Expanded(
-                    child: _field(
-                      label: 'UP SPEED',
-                      hint: '10',
-                      icon: Icons.arrow_upward,
-                      ctrl: _upCtrl,
-                      keyboardType: TextInputType.number,
+                // UP SPEED & DOWN SPEED
+                Row(
+                  children: [
+                    Expanded(child: _field(label: 'UP SPEED', hint: '10', ctrl: _upCtrl, numeric: true)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _field(label: 'DOWN SPEED', hint: '18', ctrl: _downCtrl, numeric: true)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                _field(label: 'UDP Window', hint: '196608', ctrl: _windowCtrl, numeric: true),
+
+                const SizedBox(height: 32),
+
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.white.withOpacity(0.05),
+                      disabledForegroundColor: Colors.white38,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _field(
-                      label: 'DOWN SPEED',
-                      hint: '18',
-                      icon: Icons.arrow_downward,
-                      ctrl: _downCtrl,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // UDP Window
-              _field(
-                label: 'UDP Window',
-                hint: '196608',
-                icon: Icons.dashboard,
-                ctrl: _windowCtrl,
-                keyboardType: TextInputType.number,
-              ),
-
-              const SizedBox(height: 32),
-
-              // Save button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Icon(Icons.save),
-                  label: Text(isEditing ? 'Update' : 'Save'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                          )
+                        : const Text('Save', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // ─── Protocol Selector ────────────────────────────
-
-  Widget _buildProtocolSelector() {
-    final isHysteria = widget.editServer?.protocol != ProtocolType.sshWs;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.borderColor),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryPurple.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.flash_on, color: AppTheme.primaryPurple, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isHysteria ? 'UDP => HYSTERIA' : 'SSH WS',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              Text(
-                isHysteria ? 'UDP/QUIC protocol' : 'SSH over WebSocket',
-                style: const TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Icon(
-            isHysteria ? Icons.bolt : Icons.terminal,
-            color: AppTheme.primaryPurple,
-            size: 20,
-          ),
-        ],
+  Widget _label(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 2),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
 
-  // ─── Reusable Field ──────────────────────────────
+  Widget _darkBox({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: child,
+    );
+  }
 
   Widget _field({
     required String label,
     required String hint,
-    required IconData icon,
     required TextEditingController ctrl,
-    TextInputType? keyboardType,
     bool obscure = false,
     Widget? suffix,
+    bool numeric = false,
   }) {
     return TextFormField(
       controller: ctrl,
       obscureText: obscure,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
+      keyboardType: numeric ? TextInputType.number : TextInputType.text,
+      style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppTheme.textSecondary, size: 20),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.04),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         suffixIcon: suffix,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFFF4444)),
+        ),
       ),
       validator: (v) {
         if (v == null || v.trim().isEmpty) return 'Required';
@@ -288,33 +250,6 @@ class _AddServerScreenState extends State<AddServerScreen> {
       },
     );
   }
-
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryPurple,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textSecondary,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── Save ─────────────────────────────────────────
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -344,26 +279,5 @@ class _AddServerScreenState extends State<AddServerScreen> {
     if (mounted) {
       Navigator.pop(context, config);
     }
-  }
-
-  void _showQrInfo() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceColor,
-        title: const Text('QR Scan', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'QR Code scanning will be available in the next update.\n\n'
-          'You can import config via JSON file from Settings.',
-          style: TextStyle(color: AppTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
   }
 }
