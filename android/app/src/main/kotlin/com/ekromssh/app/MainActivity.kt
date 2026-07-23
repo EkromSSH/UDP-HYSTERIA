@@ -23,31 +23,6 @@ class MainActivity : FlutterActivity() {
 
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
-                "startHysteria" -> {
-                    val host = call.argument<String>("host") ?: ""
-                    val port = call.argument<Int>("port") ?: 36712
-                    val password = call.argument<String>("password") ?: ""
-                    val obfsPassword = call.argument<String>("obfsPassword") ?: ""
-                    val alpn = call.argument<String>("alpn") ?: "h3"
-
-                    val intent = VpnService.prepare(this)
-                    if (intent != null) {
-                        startActivityForResult(intent, VPN_REQUEST_CODE)
-                        // After user grants permission, start service
-                        // For now, proceed with cached result
-                    }
-
-                    val serviceIntent = Intent(this, EkromVpnService::class.java).apply {
-                        action = EkromVpnService.ACTION_START_HYSTERIA
-                        putExtra("host", host)
-                        putExtra("port", port)
-                        putExtra("password", password)
-                        putExtra("obfsPassword", obfsPassword)
-                        putExtra("alpn", alpn)
-                    }
-                    startForegroundServiceCompat(serviceIntent)
-                    result.success(true)
-                }
                 "startSshWs" -> {
                     val host = call.argument<String>("host") ?: ""
                     val sshPort = call.argument<Int>("sshPort") ?: 22
@@ -56,8 +31,15 @@ class MainActivity : FlutterActivity() {
                     val wsPort = call.argument<Int>("wsPort") ?: 8080
                     val wsPath = call.argument<String>("wsPath") ?: "/"
 
+                    // Request VPN permission
+                    val intent = VpnService.prepare(this)
+                    if (intent != null) {
+                        startActivityForResult(intent, VPN_REQUEST_CODE)
+                        // For now, proceed anyway
+                    }
+
                     val serviceIntent = Intent(this, EkromVpnService::class.java).apply {
-                        action = EkromVpnService.ACTION_START_SSH_WS
+                        action = EkromVpnService.ACTION_CONNECT
                         putExtra("host", host)
                         putExtra("sshPort", sshPort)
                         putExtra("username", username)
@@ -68,9 +50,21 @@ class MainActivity : FlutterActivity() {
                     startForegroundServiceCompat(serviceIntent)
                     result.success(true)
                 }
+                "startHysteria" -> {
+                    val host = call.argument<String>("host") ?: ""
+                    val port = call.argument<String>("port") ?: "36712"
+                    val auth = call.argument<String>("auth") ?: ""
+                    val obfsPassword = call.argument<String>("obfsPassword") ?: ""
+                    val upSpeed = call.argument<Int>("upSpeed") ?: 10
+                    val downSpeed = call.argument<Int>("downSpeed") ?: 18
+                    val udpWindow = call.argument<Int>("udpWindow") ?: 196608
+
+                    // Hysteria via Go binding - placeholder for future
+                    result.success(false)
+                }
                 "stopVpn" -> {
                     val serviceIntent = Intent(this, EkromVpnService::class.java).apply {
-                        action = EkromVpnService.ACTION_STOP
+                        action = EkromVpnService.ACTION_DISCONNECT
                     }
                     startService(serviceIntent)
                     result.success(true)
@@ -101,8 +95,8 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == VPN_REQUEST_CODE && resultCode == RESULT_OK) {
-            // VPN permission granted
+        if (requestCode == VPN_REQUEST_CODE) {
+            // VPN permission granted (or denied)
         }
     }
 
@@ -117,15 +111,13 @@ class MainActivity : FlutterActivity() {
     private inner class VpnStatusReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val status = intent.getStringExtra("status") ?: return
-            val bytesSent = intent.getIntExtra("bytesSent", 0)
-            val bytesReceived = intent.getIntExtra("bytesReceived", 0)
             val errorMessage = intent.getStringExtra("errorMessage") ?: ""
 
             when (status) {
                 "connected" -> methodChannel?.invokeMethod("onStatusChanged", mapOf(
                     "status" to "connected",
-                    "bytesSent" to bytesSent,
-                    "bytesReceived" to bytesReceived
+                    "bytesSent" to 0,
+                    "bytesReceived" to 0
                 ))
                 "disconnected" -> methodChannel?.invokeMethod("onStatusChanged", mapOf(
                     "status" to "disconnected",
@@ -135,6 +127,9 @@ class MainActivity : FlutterActivity() {
                 "error" -> methodChannel?.invokeMethod("onStatusChanged", mapOf(
                     "status" to "error",
                     "errorMessage" to errorMessage
+                ))
+                "connecting" -> methodChannel?.invokeMethod("onStatusChanged", mapOf(
+                    "status" to "connecting"
                 ))
             }
         }

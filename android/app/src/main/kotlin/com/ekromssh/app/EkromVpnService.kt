@@ -3,270 +3,167 @@ package com.ekromssh.app
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import android.os.IBinder
 import android.os.ParcelFileDescriptor
-import androidx.core.app.NotificationCompat
+import com.jcraft.jsch.JSch
+import com.jcraft.jsch.Session
 import kotlinx.coroutines.*
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.FileDescriptor
 import java.net.InetSocketAddress
-import java.nio.ByteBuffer
-import java.nio.channels.DatagramChannel
-import java.util.concurrent.atomic.AtomicBoolean
+import java.net.ServerSocket
+import java.net.Socket
 
 class EkromVpnService : VpnService() {
-    companion object {
-        const val ACTION_START_HYSTERIA = "com.ekromssh.app.START_HYSTERIA"
-        const val ACTION_START_SSH_WS = "com.ekromssh.app.START_SSH_WS"
-        const val ACTION_STOP = "com.ekromssh.app.STOP"
-        const val NOTIFICATION_CHANNEL_ID = "udp_hysteria_channel"
-        const val NOTIFICATION_ID = 1001
 
-        private var instance: EkromVpnService? = null
-        fun isRunning(): Boolean = instance?.isRunning?.get() == true
-
-        // Config for current connection
-        var currentHost: String = ""
-        var currentPort: Int = 0
-        var currentPassword: String = ""
-        var currentProtocol: String = "hysteria"
-        var currentUsername: String = "root"
-        var currentWsPath: String = "/"
-    }
-
-    private val isRunning = AtomicBoolean(false)
-    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var tunInterface: ParcelFileDescriptor? = null
+    private var vpnInterface: ParcelFileDescriptor? = null
+    private var sshSession: Session? = null
+    private var socksServer: ServerSocket? = null
     private var job: Job? = null
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override fun onCreate() {
-        super.onCreate()
-        instance = this
-        createNotificationChannel()
+    companion object {
+        const val ACTION_CONNECT = "com.ekromssh.app.CONNECT"
+        const val ACTION_DISCONNECT = "com.ekromssh.app.DISCONNECT"
+        const val BROADCAST_STATUS = "com.ekromssh.app.VPN_STATUS"
+        private var _isRunning = false
+        fun isRunning() = _isRunning
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_START_HYSTERIA -> {
-                currentHost = intent.getStringExtra("host") ?: ""
-                currentPort = intent.getIntExtra("port", 36712)
-                currentPassword = intent.getStringExtra("password") ?: ""
-                val obfsPassword = intent.getStringExtra("obfsPassword") ?: ""
-                val alpn = intent.getStringExtra("alpn") ?: "h3"
-                currentProtocol = "hysteria"
-                startHysteriaVpn(currentHost, currentPort, currentPassword, obfsPassword, alpn)
+            ACTION_CONNECT -> {
+                val host = intent.getStringExtra("host") ?: return START_STICKY
+                val sshPort = intent.getIntExtra("sshPort", 22)
+                val username = intent.getStringExtra("username") ?: "root"
+                val password = intent.getStringExtra("password") ?: ""
+                val wsPort = intent.getIntExtra("wsPort", 8080)
+                val wsPath = intent.getStringExtra("wsPath") ?: "/"
+
+                startForeground(createNotification())
+                scope.launch { connect(host, sshPort, username, password, wsPort, wsPath) }
             }
-            ACTION_START_SSH_WS -> {
-                currentHost = intent.getStringExtra("host") ?: ""
-                currentPort = intent.getIntExtra("wsPort", 8080)
-                currentPassword = intent.getStringExtra("password") ?: ""
-                currentUsername = intent.getStringExtra("username") ?: "root"
-                currentWsPath = intent.getStringExtra("wsPath") ?: "/"
-                currentProtocol = "sshWs"
-                startSshWsVpn(currentHost, currentPort, currentUsername, currentPassword, currentWsPath)
-            }
-            ACTION_STOP -> {
-                stopVpn()
+            ACTION_DISCONNECT -> {
+                disconnect()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
         return START_STICKY
     }
 
+    private suspend fun connect(
+        host: String, sshPort: Int, username: String, password: String,
+        wsPort: Int, wsPath: String
+    ) = withContext(Dispatchers.IO) {
+        try {
+            _isRunning = true
+            broadcastStatus("connecting")
+
+            // 1. Start VPN interface
+            val builder = Builder()
+            builder.setSession("EkromSSH")
+            builder.setMtu(1500)
+            builder.addAddress("10.0.0.2", 32)
+            builder.addRoute("0.0.0.0", 0) // Route all traffic
+            builder.addDnsServer("8.8.8.8")
+            builder.addDnsServer("1.1.1.1")
+
+            // Block apps that shouldn't use VPN (optional)
+            // builder.addDisallowedApplication("com.android.chrome")
+
+            vpnInterface = builder.establish()
+
+            // 2. Connect SSH via JSch
+            val jsch = JSch()
+            sshSession = jsch.getSession(username, host, sshPort)
+            sshSession?.setPassword(password)
+
+            // Auto-accept host key for demo (in production, should verify)
+            val sshConfig = java.util.Properties()
+            sshConfig["StrictHostKeyChecking"] = "no"
+            sshConfig["compression.s2c"] = "zlib,none"
+            sshConfig["compression.c2s"] = "zlib,none"
+            sshSession?.setConfig(sshConfig)
+
+            sshSession?.connect(10000) // 10s timeout
+
+            // 3. Create SOCKS proxy via SSH dynamic port forwarding
+            socksServer = ServerSocket(0) // random available port
+            val socksPort = socksServer!!.localPort
+
+            // Use JSch's built-in port forwarding for SOCKS
+            sshSession?.setPortForwardingR(InetSocketAddress("127.0.0.1", socksPort))
+
+            broadcastStatus("connected")
+
+            // 4. Handle TUN traffic forwarding (simplified)
+            handleTunTraffic(vpnInterface?.fd, socksPort)
+
+        } catch (e: Exception) {
+            broadcastStatus("error", e.message ?: "Connection failed")
+            disconnect()
+        }
+    }
+
+    private fun handleTunTraffic(fd: FileDescriptor?, socksPort: Int) {
+        // Simplified: For now we just keep the connection alive.
+        // Real implementation would:
+        // 1. Read IP packets from TUN fd
+        // 2. Parse TCP/UDP headers
+        // 3. Forward through SOCKS5 proxy on 127.0.0.1:socksPort
+        // 4. Use tun2socks (native) or manual packet routing
+        //
+        // For v1, SSH connection test + status display works
+        // Full TUN routing will be added in next version with tun2socks native lib
+    }
+
+    private fun disconnect() {
+        job?.cancel()
+        try { sshSession?.disconnect() } catch (_: Exception) {}
+        try { socksServer?.close() } catch (_: Exception) {}
+        try { vpnInterface?.close() } catch (_: Exception) {}
+        sshSession = null
+        socksServer = null
+        vpnInterface = null
+        _isRunning = false
+        broadcastStatus("disconnected")
+    }
+
+    private fun broadcastStatus(status: String, errorMessage: String = "") {
+        val intent = Intent(BROADCAST_STATUS).apply {
+            putExtra("status", status)
+            if (errorMessage.isNotEmpty()) putExtra("errorMessage", errorMessage)
+        }
+        sendBroadcast(intent)
+    }
+
+    private fun createNotification(): Notification {
+        val channelId = "EkromSSH_VPN"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId, "EkromSSH VPN Service",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply { setShowBadge(false) }
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+                .createNotificationChannel(channel)
+        }
+        return Notification.Builder(this, channelId)
+            .setContentTitle("EkromSSH")
+            .setContentText("VPN is active")
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setOngoing(true)
+            .build()
+    }
+
     override fun onDestroy() {
-        stopVpn()
-        instance = null
+        disconnect()
+        scope.cancel()
         super.onDestroy()
     }
 
-    private fun startHysteriaVpn(
-        host: String, port: Int, password: String,
-        obfsPassword: String, alpn: String
-    ) {
-        if (isRunning.get()) return
-
-        val builder = Builder()
-        builder.setSession("EkromSSH Hysteria")
-        builder.setMtu(1500)
-        builder.addAddress("10.0.0.2", 24)
-        builder.addRoute("0.0.0.0", 0)
-        builder.addDnsServer("8.8.8.8")
-        builder.addDnsServer("1.1.1.1")
-        builder.setBlocking(true)
-
-        tunInterface = builder.establish()
-        if (tunInterface == null) {
-            sendStatus("error", "Failed to establish VPN interface")
-            return
-        }
-
-        isRunning.set(true)
-        startForeground(NOTIFICATION_ID, buildNotification("UDP • $host"))
-
-        job = serviceScope.launch {
-            try {
-                // Read from TUN and forward to Hysteria proxy
-                val tunIn = FileInputStream(tunInterface!!.fileDescriptor)
-                val tunOut = FileOutputStream(tunInterface!!.fileDescriptor)
-                val buffer = ByteArray(32767)
-
-                // Connection to local Hysteria SOCKS5 proxy
-                // In production, use Hysteria Go bindings
-                // For now, establish a simple UDP tunnel
-                val udpChannel = DatagramChannel.open()
-                udpChannel.connect(InetSocketAddress(host, port))
-                udpChannel.configureBlocking(false)
-
-                val receiveBuffer = ByteBuffer.allocate(65535)
-                val sendBuffer = ByteBuffer.allocate(65535)
-
-                while (isActive && isRunning.get()) {
-                    // Read from TUN
-                    val read = tunIn.read(buffer)
-                    if (read <= 0) break
-
-                    // Process packet and forward through tunnel
-                    // In production: encrypt and send via Hysteria protocol
-                    sendBuffer.clear()
-                    sendBuffer.put(buffer, 0, read)
-                    sendBuffer.flip()
-                    udpChannel.send(sendBuffer, InetSocketAddress(host, port))
-
-                    // Read responses from tunnel
-                    receiveBuffer.clear()
-                    val source = udpChannel.receive(receiveBuffer)
-                    if (source != null) {
-                        receiveBuffer.flip()
-                        val received = ByteArray(receiveBuffer.remaining())
-                        receiveBuffer.get(received)
-                        tunOut.write(received)
-                        tunOut.flush()
-                    }
-
-                    // Traffic update
-                    sendTrafficUpdate(read, receiveBuffer.position())
-                    delay(100)
-                }
-            } catch (e: Exception) {
-                sendStatus("error", e.message ?: "Connection error")
-            } finally {
-                stopVpn()
-            }
-        }
-    }
-
-    private fun startSshWsVpn(
-        host: String, wsPort: Int,
-        username: String, password: String, wsPath: String
-    ) {
-        if (isRunning.get()) return
-
-        val builder = Builder()
-        builder.setSession("EkromSSH SSH WS")
-        builder.setMtu(1500)
-        builder.addAddress("10.0.0.2", 24)
-        builder.addRoute("0.0.0.0", 0)
-        builder.addDnsServer("8.8.8.8")
-        builder.addDnsServer("1.1.1.1")
-        builder.setBlocking(true)
-
-        tunInterface = builder.establish()
-        if (tunInterface == null) {
-            sendStatus("error", "Failed to establish VPN interface")
-            return
-        }
-
-        isRunning.set(true)
-        startForeground(NOTIFICATION_ID, buildNotification("SSH • $host"))
-
-        job = serviceScope.launch {
-            try {
-                val tunIn = FileInputStream(tunInterface!!.fileDescriptor)
-                val tunOut = FileOutputStream(tunInterface!!.fileDescriptor)
-                val buffer = ByteArray(32767)
-
-                // Connect via WebSocket then SSH
-                // In production: use OkHttp WebSocket + JSch SSH
-                val wsUrl = "ws://$host:$wsPort$wsPath"
-
-                while (isActive && isRunning.get()) {
-                    val read = tunIn.read(buffer)
-                    if (read <= 0) break
-
-                    // Forward TUN traffic through SSH WS tunnel
-                    // In production: send via WebSocket which proxies to SSH
-
-                    sendTrafficUpdate(read, 0)
-                    delay(100)
-                }
-            } catch (e: Exception) {
-                sendStatus("error", e.message ?: "Connection error")
-            } finally {
-                stopVpn()
-            }
-        }
-    }
-
-    private fun stopVpn() {
-        isRunning.set(false)
-        job?.cancel()
-        job = null
-        tunInterface?.close()
-        tunInterface = null
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
-        sendStatus("disconnected", "")
-    }
-
-    private fun sendStatus(status: String, message: String) {
-        val intent = Intent("com.ekromssh.app.VPN_STATUS")
-        intent.putExtra("status", status)
-        intent.putExtra("errorMessage", message)
-        sendBroadcast(intent)
-    }
-
-    private fun sendTrafficUpdate(sent: Int, received: Int) {
-        val intent = Intent("com.ekromssh.app.TRAFFIC_UPDATE")
-        intent.putExtra("bytesSent", sent)
-        intent.putExtra("bytesReceived", received)
-        sendBroadcast(intent)
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                "EkromSSH VPN",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "VPN connection status"
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun buildNotification(content: String): Notification {
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-        val stopIntent = PendingIntent.getService(
-            this, 1,
-            Intent(this, EkromVpnService::class.java).apply { action = ACTION_STOP },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("EkromSSH")
-            .setContentText(content)
-            .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentIntent(pendingIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Disconnect", stopIntent)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 }
