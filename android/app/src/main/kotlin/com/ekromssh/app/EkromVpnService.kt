@@ -88,7 +88,7 @@ class EkromVpnService : VpnService() {
         if (isRunning.get()) return
 
         val builder = Builder()
-        builder.setName("EkromSSH Hysteria")
+        builder.setSession("EkromSSH Hysteria")
         builder.setMtu(1500)
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
@@ -164,7 +164,7 @@ class EkromVpnService : VpnService() {
         if (isRunning.get()) return
 
         val builder = Builder()
-        builder.setName("EkromSSH SSH WS")
+        builder.setSession("EkromSSH SSH WS")
         builder.setMtu(1500)
         builder.addAddress("10.0.0.2", 24)
         builder.addRoute("0.0.0.0", 0)
