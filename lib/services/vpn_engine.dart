@@ -57,11 +57,11 @@ class VpnEngine {
       final result = await _channel.invokeMethod<bool>('startHysteria', {
         'host': config.host,
         'port': config.hysteriaPort,
-        'password': config.hysteriaPassword,
+        'auth': config.hysteriaAuth,
         'obfsPassword': config.hysteriaObfsPassword,
-        'alpn': config.hysteriaAlpn,
-        'uploadMbps': config.hysteriaUploadMbps,
-        'downloadMbps': config.hysteriaDownloadMbps,
+        'upSpeed': config.hysteriaUpSpeed,
+        'downSpeed': config.hysteriaDownSpeed,
+        'udpWindow': config.hysteriaUdpWindow,
       });
       return result ?? false;
     } on PlatformException catch (e) {

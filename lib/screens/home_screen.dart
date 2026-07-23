@@ -94,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                               ),
                               Text(
-                                                          'Fast UDP Tunnel',
+                                                          'UDP Hysteria',
                                 style: TextStyle(
                                   fontSize: 11,
                                   color: AppTheme.textSecondary,

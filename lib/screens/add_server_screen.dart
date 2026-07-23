@@ -14,25 +14,55 @@ class AddServerScreen extends StatefulWidget {
 
 class _AddServerScreenState extends State<AddServerScreen> {
   final _formKey = GlobalKey<FormState>();
-  late ServerConfig _config;
+  final _nameCtrl = TextEditingController();
+  final _hostCtrl = TextEditingController();
+  final _portCtrl = TextEditingController();
+  final _authCtrl = TextEditingController();
+  final _obfsCtrl = TextEditingController();
+  final _upCtrl = TextEditingController();
+  final _downCtrl = TextEditingController();
+  final _windowCtrl = TextEditingController();
   bool _saving = false;
-  bool _showPassword = false;
-  bool _showSshPassword = false;
+  bool _showAuth = false;
   bool _showObfs = false;
 
   @override
   void initState() {
     super.initState();
-    _config = widget.editServer?.copy() ?? ServerConfig();
+    final s = widget.editServer;
+    if (s != null) {
+      _nameCtrl.text = s.name;
+      _hostCtrl.text = s.host;
+      _portCtrl.text = s.hysteriaPort;
+      _authCtrl.text = s.hysteriaAuth;
+      _obfsCtrl.text = s.hysteriaObfsPassword;
+      _upCtrl.text = s.hysteriaUpSpeed.toString();
+      _downCtrl.text = s.hysteriaDownSpeed.toString();
+      _windowCtrl.text = s.hysteriaUdpWindow.toString();
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _hostCtrl.dispose();
+    _portCtrl.dispose();
+    _authCtrl.dispose();
+    _obfsCtrl.dispose();
+    _upCtrl.dispose();
+    _downCtrl.dispose();
+    _windowCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.editServer != null;
+    final isSsh = widget.editServer?.protocol == ProtocolType.sshWs;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Server' : 'Add Server'),
+        title: Text(isEditing ? 'Edit Configuration' : 'Add Configuration'),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
@@ -48,49 +78,110 @@ class _AddServerScreenState extends State<AddServerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── Basic Info ──────────────────────────────
-              _SectionHeader(title: 'Basic Information'),
-              const SizedBox(height: 12),
-              _buildTextField(
-                label: 'Server Name',
-                hint: 'My Server 1',
-                icon: Icons.label_outline,
-                initialValue: _config.name,
-                onChanged: (v) => _config.name = v,
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                label: 'Host / IP Address',
-                hint: 'server.example.com',
-                icon: Icons.language,
-                initialValue: _config.host,
-                onChanged: (v) => _config.host = v,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // ─── Protocol Selector ───────────────────────
-              _SectionHeader(title: 'Protocol'),
-              const SizedBox(height: 12),
-              _buildProtocolSelector(),
+              // Protocol selector
+              _buildSectionHeader('Protocol'),
               const SizedBox(height: 8),
-              _buildProtocolFields(),
+              _buildProtocolSelector(),
 
-              const SizedBox(height: 12),
-              _buildTextField(
-                label: 'Remarks (optional)',
-                hint: 'For personal notes',
-                icon: Icons.notes,
-                initialValue: _config.remarks ?? '',
-                onChanged: (v) => _config.remarks = v,
+              const SizedBox(height: 20),
+              _buildSectionHeader('Configuration'),
+              const SizedBox(height: 8),
+
+              // Config Name
+              _field(
+                label: 'Config Name',
+                hint: '239',
+                icon: Icons.label_outline,
+                ctrl: _nameCtrl,
               ),
+              const SizedBox(height: 12),
+
+              // UDP Host
+              _field(
+                label: 'UDP Host',
+                hint: 'app.idavpn.win',
+                icon: Icons.language,
+                ctrl: _hostCtrl,
+              ),
+              const SizedBox(height: 12),
+
+              // UDP Port
+              _field(
+                label: 'UDP Port',
+                hint: '10000-50000',
+                icon: Icons.router,
+                ctrl: _portCtrl,
+              ),
+              const SizedBox(height: 12),
+
+              // AUTH
+              _field(
+                label: 'AUTH',
+                hint: 'ida:ida',
+                icon: Icons.lock_outline,
+                ctrl: _authCtrl,
+                obscure: !_showAuth,
+                suffix: IconButton(
+                  icon: Icon(_showAuth ? Icons.visibility_off : Icons.visibility,
+                      color: AppTheme.textSecondary),
+                  onPressed: () => setState(() => _showAuth = !_showAuth),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // OBFS
+              _field(
+                label: 'OBFS',
+                hint: 'admin',
+                icon: Icons.shuffle,
+                ctrl: _obfsCtrl,
+                obscure: !_showObfs,
+                suffix: IconButton(
+                  icon: Icon(_showObfs ? Icons.visibility_off : Icons.visibility,
+                      color: AppTheme.textSecondary),
+                  onPressed: () => setState(() => _showObfs = !_showObfs),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // UP SPEED & DOWN SPEED
+              Row(
+                children: [
+                  Expanded(
+                    child: _field(
+                      label: 'UP SPEED',
+                      hint: '10',
+                      icon: Icons.arrow_upward,
+                      ctrl: _upCtrl,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _field(
+                      label: 'DOWN SPEED',
+                      hint: '18',
+                      icon: Icons.arrow_downward,
+                      ctrl: _downCtrl,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // UDP Window
+              _field(
+                label: 'UDP Window',
+                hint: '196608',
+                icon: Icons.dashboard,
+                ctrl: _windowCtrl,
+                keyboardType: TextInputType.number,
+              ),
+
               const SizedBox(height: 32),
 
-              // ─── Save Button ─────────────────────────────
+              // Save button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -102,7 +193,7 @@ class _AddServerScreenState extends State<AddServerScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.save),
-                  label: Text(isEditing ? 'Update Server' : 'Save Server'),
+                  label: Text(isEditing ? 'Update' : 'Save'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
@@ -116,10 +207,12 @@ class _AddServerScreenState extends State<AddServerScreen> {
     );
   }
 
-  // ─── Protocol Fields ──────────────────────────────────────
+  // ─── Protocol Selector ────────────────────────────
 
   Widget _buildProtocolSelector() {
+    final isHysteria = widget.editServer?.protocol != ProtocolType.sshWs;
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor,
         borderRadius: BorderRadius.circular(12),
@@ -127,305 +220,76 @@ class _AddServerScreenState extends State<AddServerScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _config.protocol = ProtocolType.hysteria),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: _config.protocol == ProtocolType.hysteria
-                      ? AppTheme.primaryPurple
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.bolt,
-                      color: _config.protocol == ProtocolType.hysteria ? Colors.white : AppTheme.textSecondary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Hysteria',
-                      style: TextStyle(
-                        color: _config.protocol == ProtocolType.hysteria ? Colors.white : AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryPurple.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: const Icon(Icons.flash_on, color: AppTheme.primaryPurple, size: 18),
           ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _config.protocol = ProtocolType.sshWs),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: _config.protocol == ProtocolType.sshWs
-                      ? AppTheme.primaryPurple
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.terminal,
-                      color: _config.protocol == ProtocolType.sshWs ? Colors.white : AppTheme.textSecondary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'SSH WS',
-                      style: TextStyle(
-                        color: _config.protocol == ProtocolType.sshWs ? Colors.white : AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isHysteria ? 'UDP => HYSTERIA' : 'SSH WS',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
                 ),
               ),
-            ),
+              Text(
+                isHysteria ? 'UDP/QUIC protocol' : 'SSH over WebSocket',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Icon(
+            isHysteria ? Icons.bolt : Icons.terminal,
+            color: AppTheme.primaryPurple,
+            size: 20,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProtocolFields() {
-    switch (_config.protocol) {
-      case ProtocolType.hysteria:
-        return _buildHysteriaFields();
-      case ProtocolType.sshWs:
-        return _buildSshWsFields();
-    }
-  }
+  // ─── Reusable Field ──────────────────────────────
 
-  Widget _buildHysteriaFields() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                label: 'Port',
-                hint: '36712',
-                icon: Icons.router,
-                keyboardType: TextInputType.number,
-                initialValue: _config.hysteriaPort.toString(),
-                onChanged: (v) => _config.hysteriaPort = int.tryParse(v) ?? 36712,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTextField(
-                label: 'ALPN',
-                hint: 'h3',
-                icon: Icons.tune,
-                initialValue: _config.hysteriaAlpn,
-                onChanged: (v) => _config.hysteriaAlpn = v,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          label: 'Password',
-          hint: 'hysteria password',
-          icon: Icons.lock_outline,
-          obscure: !_showPassword,
-          initialValue: _config.hysteriaPassword,
-          onChanged: (v) => _config.hysteriaPassword = v,
-          suffix: IconButton(
-            icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility,
-                color: AppTheme.textSecondary),
-            onPressed: () => setState(() => _showPassword = !_showPassword),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                label: 'Upload Mbps',
-                hint: '100',
-                icon: Icons.arrow_upward,
-                keyboardType: TextInputType.number,
-                initialValue: _config.hysteriaUploadMbps.toString(),
-                onChanged: (v) => _config.hysteriaUploadMbps = int.tryParse(v) ?? 100,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTextField(
-                label: 'Download Mbps',
-                hint: '100',
-                icon: Icons.arrow_downward,
-                keyboardType: TextInputType.number,
-                initialValue: _config.hysteriaDownloadMbps.toString(),
-                onChanged: (v) => _config.hysteriaDownloadMbps = int.tryParse(v) ?? 100,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          label: 'Obfs Password (optional)',
-          hint: 'salamander password',
-          icon: Icons.shuffle,
-          obscure: !_showObfs,
-          initialValue: _config.hysteriaObfsPassword,
-          onChanged: (v) => _config.hysteriaObfsPassword = v,
-          suffix: IconButton(
-            icon: Icon(_showObfs ? Icons.visibility_off : Icons.visibility,
-                color: AppTheme.textSecondary),
-            onPressed: () => setState(() => _showObfs = !_showObfs),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSshWsFields() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildTextField(
-                label: 'SSH Port',
-                hint: '22',
-                icon: Icons.router,
-                keyboardType: TextInputType.number,
-                initialValue: _config.sshPort.toString(),
-                onChanged: (v) => _config.sshPort = int.tryParse(v) ?? 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildTextField(
-                label: 'WS Port',
-                hint: '8080',
-                icon: Icons.web,
-                keyboardType: TextInputType.number,
-                initialValue: _config.wsPort.toString(),
-                onChanged: (v) => _config.wsPort = int.tryParse(v) ?? 8080,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          label: 'SSH Username',
-          hint: 'root',
-          icon: Icons.person,
-          initialValue: _config.sshUsername,
-          onChanged: (v) => _config.sshUsername = v,
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          label: 'SSH Password',
-          hint: 'password',
-          icon: Icons.lock_outline,
-          obscure: !_showSshPassword,
-          initialValue: _config.sshPassword,
-          onChanged: (v) => _config.sshPassword = v,
-          suffix: IconButton(
-            icon: Icon(_showSshPassword ? Icons.visibility_off : Icons.visibility,
-                color: AppTheme.textSecondary),
-            onPressed: () => setState(() => _showSshPassword = !_showSshPassword),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildTextField(
-          label: 'WebSocket Path',
-          hint: '/',
-          icon: Icons.link,
-          initialValue: _config.wsPath,
-          onChanged: (v) => _config.wsPath = v,
-        ),
-      ],
-    );
-  }
-
-  // ─── Helper Widgets ───────────────────────────────────────
-
-  Widget _buildTextField({
+  Widget _field({
     required String label,
-    String? hint,
+    required String hint,
     required IconData icon,
+    required TextEditingController ctrl,
     TextInputType? keyboardType,
     bool obscure = false,
-    String? initialValue,
-    ValueChanged<String>? onChanged,
-    FormFieldValidator<String>? validator,
     Widget? suffix,
   }) {
     return TextFormField(
-      initialValue: initialValue,
+      controller: ctrl,
       obscureText: obscure,
       keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
-      validator: validator,
-      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+        prefixIcon: Icon(icon, color: AppTheme.textSecondary, size: 20),
         suffixIcon: suffix,
       ),
+      validator: (v) {
+        if (v == null || v.trim().isEmpty) return 'Required';
+        return null;
+      },
     );
   }
 
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _saving = true);
-
-    final storage = await StorageService.getInstance();
-    if (widget.editServer != null) {
-      await storage.updateServer(_config);
-    } else {
-      await storage.addServer(_config);
-    }
-
-    if (mounted) {
-      Navigator.pop(context, _config);
-    }
-  }
-
-  void _showQrInfo() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceColor,
-        title: const Text('QR Scan', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'QR Code scanning will be available in the next update.\n\n'
-          'You can import config via JSON file from Settings.',
-          style: TextStyle(color: AppTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSectionHeader(String title) {
     return Row(
       children: [
         Container(
@@ -447,6 +311,59 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // ─── Save ─────────────────────────────────────────
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _saving = true);
+
+    final config = ServerConfig(
+      id: widget.editServer?.id,
+      name: _nameCtrl.text.trim(),
+      host: _hostCtrl.text.trim(),
+      protocol: ProtocolType.hysteria,
+      hysteriaPort: _portCtrl.text.trim(),
+      hysteriaAuth: _authCtrl.text.trim(),
+      hysteriaObfsPassword: _obfsCtrl.text.trim(),
+      hysteriaUpSpeed: int.tryParse(_upCtrl.text.trim()) ?? 10,
+      hysteriaDownSpeed: int.tryParse(_downCtrl.text.trim()) ?? 18,
+      hysteriaUdpWindow: int.tryParse(_windowCtrl.text.trim()) ?? 196608,
+      createdAt: widget.editServer?.createdAt,
+    );
+
+    final storage = await StorageService.getInstance();
+    if (widget.editServer != null) {
+      await storage.updateServer(config);
+    } else {
+      await storage.addServer(config);
+    }
+
+    if (mounted) {
+      Navigator.pop(context, config);
+    }
+  }
+
+  void _showQrInfo() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.surfaceColor,
+        title: const Text('QR Scan', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'QR Code scanning will be available in the next update.\n\n'
+          'You can import config via JSON file from Settings.',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 }
