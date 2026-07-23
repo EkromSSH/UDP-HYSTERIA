@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           _SettingsTile(
             icon: Icons.shield_outlined,
-            title: 'UDP HYSTERIA VPN',
+            title: 'EkromSSH',
             subtitle: 'Hysteria + SSH WebSocket Client',
           ),
           const SizedBox(height: 32),
@@ -256,7 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showAbout() {
     showAboutDialog(
       context: context,
-      applicationName: 'UDP HYSTERIA VPN',
+      applicationName: 'EkromSSH',
       applicationVersion: 'v$_appVersion',
       applicationIcon: Container(
         width: 48,

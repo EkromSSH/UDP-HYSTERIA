@@ -8,11 +8,11 @@ import 'screens/settings_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const UDP HYSTERIAApp());
+  runApp(const EkromSSHApp());
 }
 
-class UDP HYSTERIAApp extends StatelessWidget {
-  const UDP HYSTERIAApp({super.key});
+class EkromSSHApp extends StatelessWidget {
+  const EkromSSHApp({super.key});
 
   @override
   Widget build(BuildContext context) {
