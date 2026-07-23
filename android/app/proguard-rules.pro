@@ -12,8 +12,8 @@
 
 # Keep JSch (SSH library)
 -keep class com.jcraft.jsch.** { *; }
--keep class com.jcraft.jzlib.** { *; }
--keep class org.ietf.jgss.** { *; }
+-dontwarn com.jcraft.jzlib.**
+-dontwarn org.ietf.jgss.**
 
 # Keep OkHttp (WebSocket)
 -keep class okhttp3.** { *; }
