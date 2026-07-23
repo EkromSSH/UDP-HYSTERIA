@@ -33,8 +33,8 @@
     <application
         android:label="EkromSSH"
         android:name="androidx.multidex.MultiDexApplication"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
+        android:roundIcon="@drawable/ic_launcher"
         android:allowBackup="false"
         android:supportsRtl="true"
         android:theme="@style/Theme.EkromSSH"
