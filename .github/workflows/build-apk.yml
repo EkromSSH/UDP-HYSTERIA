@@ -19,6 +19,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      - name: Generate Gradle Wrapper
+        run: |
+          cd android
+          gradle wrapper --gradle-version 8.7 2>/dev/null || true
+          ls -la gradlew 2>/dev/null || echo "gradlew not found"
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
