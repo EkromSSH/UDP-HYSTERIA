@@ -41,7 +41,7 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
-        <!-- Main Activity -->
+        <!-- Main Activity (Flutter v2 embedding) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -49,6 +49,9 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="flutterEmbedding"
+                android:value="2" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
