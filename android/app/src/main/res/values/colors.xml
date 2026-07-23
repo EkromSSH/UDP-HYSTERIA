@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Colors -->
+    <color name="primary_purple">#FF6A0DAD</color>
+    <color name="dark_purple">#FF4A0072</color>
+    <color name="light_purple">#FF9C27B0</color>
+    <color name="accent_purple">#FFE1BEE7</color>
+    <color name="background">#FF0D0D1A</color>
+    <color name="surface">#FF1A1A2E</color>
+    <color name="card">#FF16213E</color>
+    <color name="success_green">#FF00E676</color>
+    <color name="error_red">#FFFF1744</color>
+    <color name="warning_orange">#FFFF9100</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0B0B0</color>
+    <color name="border_color">#FF2A2A4A</color>
+
+    <!-- VPN Status Colors -->
+    <color name="vpn_connected">#FF00E676</color>
+    <color name="vpn_disconnected">#FFFF1744</color>
+    <color name="vpn_connecting">#FFFF9100</color>
+</resources>

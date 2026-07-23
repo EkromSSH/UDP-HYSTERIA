@@ -1,0 +1,57 @@
+name: Build UDP HYSTERIA APK
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'oracle'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: 'stable'
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (release)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build APK (fat)
+        run: flutter build apk --release
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: UDP-HYSTERIA-APKs
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: UDP-HYSTERIA-Android-Bundle
+          path: |
+            build/app/outputs/bundle/release/*.aab
+          compression-level: 0
+          retention-days: 30

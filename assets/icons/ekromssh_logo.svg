@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6A0DAD"/>
+      <stop offset="100%" style="stop-color:#4A0072"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="url(#bg)"/>
+  <!-- Shield -->
+  <path d="M50 15 L15 30 v25 c0 25 15 30 35 35 c20-5 35-10 35-35 V30Z" 
+        fill="white" opacity="0.95"/>
+  <!-- Bolt -->
+  <path d="M42 55 l-5 25 15-8 -5 25 22-35 -16 8Z" 
+        fill="#6A0DAD"/>
+  <text x="50" y="92" text-anchor="middle" font-family="Arial" 
+        font-size="9" fill="white" font-weight="bold">EkromSSH</text>
+</svg>

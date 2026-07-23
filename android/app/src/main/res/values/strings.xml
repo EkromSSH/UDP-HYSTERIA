@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">UDP HYSTERIA</string>
+    <string name="app_tagline">Fast UDP Tunnel</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_servers">Servers</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Connection -->
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting…</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="select_server">Select Server &amp; Connect</string>
+
+    <!-- Protocols -->
+    <string name="protocol_hysteria">Hysteria</string>
+    <string name="protocol_ssh_ws">SSH WS</string>
+
+    <!-- General -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="confirm">Confirm</string>
+
+    <!-- Traffic -->
+    <string name="upload">Upload</string>
+    <string name="download">Download</string>
+
+    <!-- Errors -->
+    <string name="error_vpn_permission">VPN permission not granted</string>
+    <string name="error_connection_failed">Connection failed</string>
+</resources>

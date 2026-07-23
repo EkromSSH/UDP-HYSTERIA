@@ -1,0 +1,37 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+*.lock
+*.iml
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Build
+build/
+android/.gradle/
+android/local.properties
+android/app/build/
+
+# Flutter
+flutter/
+bin/cache/
+packages/flutter/
+packages/flutter_test/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+
+# Android
+android/keystore.jks
+android/key.properties
+
+# Misc
+*.log
+*.bak
+*.tmp
+*.tgz
+*.tar.gz
