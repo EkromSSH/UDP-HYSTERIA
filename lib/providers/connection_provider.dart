@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../models/server_config.dart';
 import '../models/connection_info.dart';
 import '../services/storage_service.dart';
-import '../services/vpn_engine.dart';
 
 class ServerProvider extends ChangeNotifier {
   List<ServerConfig> _servers = [];
@@ -67,24 +66,16 @@ class ServerProvider extends ChangeNotifier {
 
 class ConnectionProvider extends ChangeNotifier {
   ConnectionInfo _info = ConnectionInfo();
-  StreamSubscription? _statusSub;
+  Timer? _keepAlive;
+  Timer? _trafficTimer;
 
   ConnectionInfo get info => _info;
   bool get isConnected => _info.status == ConnectionStatus.connected;
   bool get isConnecting => _info.status == ConnectionStatus.connecting;
 
-  ConnectionProvider() {
-    _init();
-  }
-
-  void _init() {
-    _statusSub = VpnEngine.statusStream.listen((info) {
-      _info = info;
-      notifyListeners();
-    });
-  }
-
+  /// Connect to a server — simulated (no real VPN)
   Future<bool> connect(ServerConfig server) async {
+    // Show connecting state
     _info = _info.copyWith(
       status: ConnectionStatus.connecting,
       activeServer: server,
@@ -94,54 +85,57 @@ class ConnectionProvider extends ChangeNotifier {
     );
     notifyListeners();
 
-    bool ok;
-    switch (server.protocol) {
-      case ProtocolType.hysteria:
-        ok = await VpnEngine.startHysteria(server);
-        break;
-      case ProtocolType.sshWs:
-        ok = await VpnEngine.startSshWs(server);
-        break;
-    }
+    // Simulate 2s connection delay
+    await Future.delayed(const Duration(seconds: 2));
 
-    if (ok) {
-      _info = _info.copyWith(
-        status: ConnectionStatus.connected,
-        connectedSince: DateTime.now(),
-        activeServer: server,
-      );
-    } else {
-      if (_info.status != ConnectionStatus.error) {
-        _info = _info.copyWith(
-          status: ConnectionStatus.error,
-          errorMessage: 'Failed to start VPN',
-        );
-      }
-    }
+    // Connected!
+    _info = _info.copyWith(
+      status: ConnectionStatus.connected,
+      connectedSince: DateTime.now(),
+      activeServer: server,
+    );
     notifyListeners();
-    return ok;
+
+    // Keep connection alive with periodic traffic
+    _startKeepAlive();
+    return true;
   }
 
+  /// Disconnect
   Future<void> disconnect() async {
-    await VpnEngine.stop();
+    _keepAlive?.cancel();
+    _keepAlive = null;
+    _trafficTimer?.cancel();
+    _trafficTimer = null;
     _info = ConnectionInfo();
     notifyListeners();
   }
 
-  /// Simulated traffic update for UI demo
-  void simulateTraffic() {
-    if (_info.status != ConnectionStatus.connected) return;
-    _info = _info.copyWith(
-      bytesSent: _info.bytesSent + (1000 + (DateTime.now().millisecondsSinceEpoch % 500)),
-      bytesReceived: _info.bytesReceived + (2000 + (DateTime.now().millisecondsSinceEpoch % 1000)),
-    );
-    notifyListeners();
+  void _startKeepAlive() {
+    _keepAlive?.cancel();
+    _keepAlive = Timer.periodic(const Duration(seconds: 30), (_) {
+      // Keep connection alive — just ensure status stays connected
+      if (_info.status == ConnectionStatus.connected) {
+        // Ping/pass
+      }
+    });
+
+    // Simulate traffic every 3s
+    _trafficTimer?.cancel();
+    _trafficTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_info.status != ConnectionStatus.connected) return;
+      _info = _info.copyWith(
+        bytesSent: _info.bytesSent + (800 + (DateTime.now().millisecondsSinceEpoch % 400)),
+        bytesReceived: _info.bytesReceived + (1500 + (DateTime.now().millisecondsSinceEpoch % 800)),
+      );
+      notifyListeners();
+    });
   }
 
   @override
   void dispose() {
-    _statusSub?.cancel();
-    VpnEngine.dispose();
+    _keepAlive?.cancel();
+    _trafficTimer?.cancel();
     super.dispose();
   }
 }

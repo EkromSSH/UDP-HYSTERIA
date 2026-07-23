@@ -5,13 +5,11 @@ import 'providers/connection_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/server_list_screen.dart';
 import 'screens/settings_screen.dart';
-import 'services/vpn_engine.dart';
 import 'services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.getInstance();
-  await VpnEngine.initialize();
   runApp(const EkromSSHApp());
 }
 

@@ -30,10 +30,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _trafficTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted) {
-        context.read<ConnectionProvider>().simulateTraffic();
-      }
+    _trafficTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      // Traffic is managed by ConnectionProvider
     });
   }
 
