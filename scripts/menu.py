@@ -423,14 +423,49 @@ def change_limit():
     except Exception as e: print(); box(); center(f"{M}\u25cf{NC} {BD}Change Limit User Online{NC}"); bsep(); bput(f"  {D}Current:{NC} {WHT}{current}{NC}"); bput(f"{R}\u274C{NC} {e}")
     bsep(); bot(); print(); time.sleep(2)
 
+def auto_fix_gaming():
+    # 1. Ensure disable_mtu_discovery=true for gaming stability
+    try:
+        if os.path.exists(HYST_CONFIG):
+            with open(HYST_CONFIG, 'r') as f: content = f.read()
+            if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery"' not in content:
+                content = content.replace('"disable_mtu_discovery": false', '"disable_mtu_discovery": true')
+                if '"disable_mtu_discovery"' not in content:
+                    content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery": true\n}'
+                with open(HYST_CONFIG, 'w') as f: f.write(content)
+                subprocess.run("systemctl restart hysteria 2>/dev/null", shell=True)
+    except: pass
+
+    # 2. Ensure BadVPN (7100, 7200, 7300) is running for Roblox / game UDP gateway
+    try:
+        r = subprocess.run("systemctl is-active badvpn3", shell=True, capture_output=True, text=True)
+        if r.stdout.strip() != "active":
+            subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
+            for p in [7100, 7200, 7300]:
+                idx = p - 7099
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 500\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
+            subprocess.run("systemctl daemon-reload && systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
+    except: pass
+
+    # 3. Ensure Sysctl UDP Buffer (8MB) & Ephemeral Port Range
+    try:
+        if not os.path.exists("/etc/sysctl.d/99-hysteria.conf"):
+            cfg = "net.core.rmem_max = 8388608\nnet.core.wmem_max = 8388608\nnet.core.rmem_default = 8388608\nnet.core.wmem_default = 8388608\nnet.ipv4.ip_local_port_range = 1024 9999\nnet.ipv4.ip_forward = 1\n"
+            with open("/etc/sysctl.d/99-hysteria.conf", "w") as f: f.write(cfg)
+            subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf 2>/dev/null", shell=True)
+    except: pass
+
 def update_dashboard():
-    os.system("clear"); print(); box(); center(f"{G}\u21bb{NC} {BD}Update Scripts{NC}"); bsep()
-    bput(f"  {D}Updating files & applying game fixes...{NC}")
+    os.system("clear"); print(); box(); center(f"{G}\u21bb{NC} {BD}Update Scripts & Game Fix{NC}"); bsep()
+    bput(f"  {D}Running update script...{NC}")
+    bsep()
     try:
         subprocess.run("curl -sL 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?t='$(date +%s) | bash", shell=True)
-        bput(f"  {G}\u2705{NC} Updated! Restart menu to apply")
-    except Exception as e: bput(f"{R}\u274C{NC} {e}")
-    bsep(); bot(); print(); time.sleep(2)
+    except Exception as e:
+        print(f"  {R}Error: {e}{NC}")
+    bsep(); bot(); print()
+    input(f"  {B}Press Enter to return to menu...{NC} ")
 
 def uninstall_dashboard():
     os.system("clear"); print(); box(); center(f"{R}\u2716{NC} {BD}Uninstall Dashboard{NC}"); bsep()
@@ -452,6 +487,7 @@ def uninstall_dashboard():
 # ══ Main ══
 if __name__ == "__main__":
     os.system("chmod 600 " + HYST_CONFIG + " 2>/dev/null")
+    auto_fix_gaming()
     while True:
         try:
             ch = show_menu()
