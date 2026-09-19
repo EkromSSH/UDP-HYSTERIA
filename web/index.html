@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ShowOn Dashboard V.1.0.7</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      background:#0d1117;
+      color:#e6edf3;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;
+      max-width:1200px;
+      margin:0 auto;
+      padding:20px;
+    }
+    h1{font-size:1.6rem;margin-bottom:16px}
+    h2{font-size:1.2rem;margin-bottom:10px}
+    .muted{color:#8b949e}
+    .grid{display:grid;gap:20px}
+    @media(min-width:900px){.grid{grid-template-columns:1fr 1fr}}
+    .card{
+      background:#161b22;
+      border:1px solid #30363d;
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 2px 4px rgba(0,0,0,0.3);
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:10px;
+      font-size:0.95rem;
+    }
+    th,td{
+      padding:10px;
+      text-align:center;
+    }
+    th{
+      background:#1f242c;
+      color:#c9d1d9;
+      font-weight:600;
+    }
+    tr:nth-child(even){background:#1a1f27}
+    tr:nth-child(odd){background:#161b22}
+    td{border-top:1px solid #2d333b}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,"Roboto Mono",monospace}
+    .ok{color:#3fb950;font-weight:600}
+    .warn{color:#d29922;font-weight:600}
+    .err{color:#f85149;font-weight:600}
+    .highlight{color:#58a6ff;font-weight:600}
+  
+    @media(max-width:600px){
+      body{padding:10px}
+      h1{font-size:1.2rem}
+      h2{font-size:1rem}
+      .grid{gap:10px}
+      .card{padding:10px}
+    }
+
+    
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    @media(max-width:600px){
+      table{font-size:.65rem}
+      th,td{padding:6px 4px}
+      .table-wrap{overflow-x:auto}
+    }
+</style>
+</head>
+<body>
+  <h1>ShowOn Dashboard <span class="muted">V.1.0.7</span></h1>
+  <div class="grid">
+    <div class="card">
+      <h2>Online Summary</h2>
+      <div class=table-wrap><table>
+        <thead>
+          <tr>
+            <th>✅ Total</th>
+            <th>🎯 Limit</th>
+            <th>🔒 SSH</th>
+            <th>🌐 OpenVPN</th>
+            <th>🟤 Dropbear</th>
+            <th>⚡ V2Ray</th>
+            <th>📡 AGN-UDP</th>
+          </tr>
+        </thead>
+        <tbody><tr id="row-online"><td colspan="7">Loading...</td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>System</h2>
+      <div class="mono" id="sys">Loading...</div>
+    </div>
+    <div class="card">
+      <h2>Traffic</h2>
+      <div class=table-wrap><table>
+        <thead id="traffic-head"></thead>
+        <tbody><tr id="row-net"><td>Loading...</td></tr></tbody>
+      </table>
+      <div class="muted" style="margin-top:6px;font-size:0.85rem">
+        * vnstat แสดงเสมอ / V2Ray จะแสดงเมื่อมีข้อมูล
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let lastSys=null,lastOnline=null,lastTraffic=null;
+
+    async function j(u){
+      const r=await fetch(u+"?_="+Date.now(),{cache:"no-store"});
+      if(!r.ok)throw new Error(r.status);return r.json();
+    }
+
+    function fmtBytes(n){
+      if(!n||isNaN(n))return"0 B";
+      n=parseFloat(n);
+      if(n<1024)return n+" B";
+      const u=["KB","MB","GB","TB","PB"];let i=-1;
+      do{n/=1024;i++}while(n>=1024&&i<u.length-1);
+      return n.toFixed(2)+" "+u[i];
+    }
+
+    async function loadAll(){
+      // Online Summary
+      try{const a=await j('./online_app.json');lastOnline=Array.isArray(a)?a[0]:a}catch(e){}
+      if(lastOnline){
+        document.getElementById('row-online').innerHTML=
+          `<td class="ok">${lastOnline.onlines}</td>
+           <td class="highlight">${lastOnline.limite}</td>
+           <td>${lastOnline.ssh}</td>
+           <td>${lastOnline.openvpn}</td>
+           <td>${lastOnline.dropbear}</td>
+           <td>${lastOnline.v2ray}</td>
+           <td class="warn">${lastOnline.agnudp}</td>`;
+      }
+
+      // System Info
+      try{const s=await j('./sysinfo.json');lastSys=Array.isArray(s)?s[0]:s}catch(e){}
+      if(lastSys){
+        document.getElementById('sys').innerText=
+          `⏱ Uptime: ${lastSys.uptime}\n🖥 CPU: ${lastSys.cpu_usage}\n🧠 RAM: ${lastSys.ram_usage}\n💾 Disk: ${lastSys.disk_usage}`;
+      }
+
+      // Traffic Info
+      try{const n=await j('./netinfo.json');lastTraffic=Array.isArray(n)?n[0]:n}catch(e){}
+      if(lastTraffic){
+        const d=lastTraffic;
+        if((d.v2ray_up && d.v2ray_up!=="0")||(d.v2ray_down && d.v2ray_down!=="0")){
+          document.getElementById('traffic-head').innerHTML=
+            `<tr><th>vnStat RX</th><th>vnStat TX</th><th>⚡ V2Ray Up</th><th>⚡ V2Ray Down</th></tr>`;
+          document.getElementById('row-net').innerHTML=
+            `<td>${fmtBytes(d.vnstat_rx)}</td>
+             <td>${fmtBytes(d.vnstat_tx)}</td>
+             <td>${fmtBytes(d.v2ray_up)}</td>
+             <td>${fmtBytes(d.v2ray_down)}</td>`;
+        }else{
+          document.getElementById('traffic-head').innerHTML=
+            `<tr><th>vnStat RX</th><th>vnStat TX</th></tr>`;
+          document.getElementById('row-net').innerHTML=
+            `<td>${fmtBytes(d.vnstat_rx)}</td>
+             <td>${fmtBytes(d.vnstat_tx)}</td>`;
+        }
+      }
+    }
+
+    loadAll();setInterval(loadAll,5000);
+  </script>
+</body>
+</html>
