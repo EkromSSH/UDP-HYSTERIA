@@ -7,6 +7,63 @@
 
 set -u -o pipefail
 
+# ═══════════════════════════════════════════════
+# Self-healing: Game Fix (MTU 1280, BadVPN 7100/7200/7300, Sysctl)
+# ═══════════════════════════════════════════════
+if [ -f /opt/hysteria/config-v1.json ]; then
+  if grep -q '"disable_mtu_discovery": false' /opt/hysteria/config-v1.json 2>/dev/null; then
+    sed -i 's/"disable_mtu_discovery": false/"disable_mtu_discovery": true/' /opt/hysteria/config-v1.json
+    systemctl restart hysteria 2>/dev/null || true
+  elif ! grep -q 'disable_mtu_discovery' /opt/hysteria/config-v1.json 2>/dev/null; then
+    sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' /opt/hysteria/config-v1.json
+    systemctl restart hysteria 2>/dev/null || true
+  fi
+fi
+
+if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
+  if [ ! -f /usr/sbin/badvpn ] || [ ! -s /usr/sbin/badvpn ]; then
+    wget -q -O /usr/sbin/badvpn "https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn" 2>/dev/null || \
+    curl -sL "https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn" -o /usr/sbin/badvpn 2>/dev/null || true
+    chmod +x /usr/sbin/badvpn 2>/dev/null || true
+  fi
+  for bp in 7100 7200 7300; do
+    bidx=$((bp - 7099))
+    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ]; then
+      cat > "/etc/systemd/system/badvpn${bidx}.service" << BV
+[Unit]
+Description=UDP ${bp}
+After=syslog.target network-online.target
+
+[Service]
+User=root
+NoNewPrivileges=true
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${bp} --max-clients 500
+Restart=on-failure
+RestartPreventExitStatus=23
+LimitNPROC=10000
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
+BV
+    fi
+  done
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
+fi
+
+if [ ! -f /etc/sysctl.d/99-hysteria.conf ]; then
+  cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
+net.core.rmem_max = 8388608
+net.core.wmem_max = 8388608
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+net.ipv4.ip_local_port_range = 1024 9999
+net.ipv4.ip_forward = 1
+EOF
+  sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
+fi
+
 # -------- Default config --------
 CONF="/etc/showon.conf"
 
