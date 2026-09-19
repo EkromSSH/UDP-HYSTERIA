@@ -441,9 +441,10 @@ def auto_fix_gaming():
     try:
         r = subprocess.run("systemctl is-active badvpn3", shell=True, capture_output=True, text=True)
         if r.stdout.strip() != "active":
+            subprocess.run("rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null", shell=True)
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
-                idx = p - 7099
+                idx = (p - 7000) // 100
                 svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 500\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)

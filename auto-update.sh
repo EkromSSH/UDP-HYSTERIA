@@ -38,7 +38,7 @@ if [ ! -f /usr/sbin/badvpn ]; then
 fi
 
 for p in 7100 7200 7300; do
-  idx=$((p - 7099))
+  idx=$(( (p - 7000) / 100 ))
   if [ ! -f /etc/systemd/system/badvpn${idx}.service ]; then
     cat > /etc/systemd/system/badvpn${idx}.service << EOF
 [Unit]

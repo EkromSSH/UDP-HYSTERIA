@@ -28,8 +28,9 @@ if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
     curl -sL "https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn" -o /usr/sbin/badvpn 2>/dev/null || true
     chmod +x /usr/sbin/badvpn 2>/dev/null || true
   fi
+  rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null || true
   for bp in 7100 7200 7300; do
-    bidx=$((bp - 7099))
+    bidx=$(( (bp - 7000) / 100 ))
     if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ]; then
       cat > "/etc/systemd/system/badvpn${bidx}.service" << BV
 [Unit]

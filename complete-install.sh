@@ -85,7 +85,7 @@ wget -q -O /usr/sbin/badvpn "https://raw.githubusercontent.com/EkromSSH/VPN/main
 chmod +x /usr/sbin/badvpn 2>/dev/null || true
 
 for p in 7100 7200 7300; do
-  idx=$((p - 7099))
+  idx=$(( (p - 7000) / 100 ))
   cat > /etc/systemd/system/badvpn${idx}.service << EOF
 [Unit]
 Description=UDP ${p}
