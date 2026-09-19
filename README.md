@@ -15,6 +15,13 @@
 | **Hysteria** | UDP-based fast proxy (QUIC) using Hysteria 2 | ✅ Core ready |
 | **SSH WebSocket** | SSH tunneling over WebSocket (ws-ssh.py) | ✅ Core ready |
 
+### 🎮 Server Quick Update & Gaming Fix (Roblox Error 279, etc.)
+สำหรับเซิร์ฟเวอร์ที่ต้องการอัปเดตและแก้ปัญหาเล่นเกมไม่ได้:
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh)
+```
+หรือเปิดเมนู `showon` แล้วเลือก `[16] Update All` (ระบบจะซ่อมแซม MTU, BadVPN 7100-7300, และ Sysctl อัตโนมัติ)
+
 ### 📱 App Features
 - **Branded UI** — Purple theme, EkromSSH identity
 - **Server Management** — Add/edit/delete multiple server configs
