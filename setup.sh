@@ -34,7 +34,7 @@ cat > /opt/hysteria/config-v1.json << EOF
   "auth_str": "${AUTH}",
   "recv_window_conn": 20971520,
   "recv_window_client": 41943040,
-  "disable_mtu_discovery": true
+  "disable_mtu_discovery":  true
 }
 EOF
 cat > /opt/hysteria/start.sh << 'E1'

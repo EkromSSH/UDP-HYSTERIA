@@ -7,17 +7,18 @@ echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria & Applying Ga
 BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
 CACHE_BUST="?t=$(date +%s)"
 
-# 1. Update MTU for gaming (disable_mtu_discovery: true)
+# 1. Update MTU for gaming (disable_mtu_discovery:  true with 2 spaces)
 echo -e "\033[1;34m==>\033[0m Fixing MTU for Mobile & Gaming..."
-if [ -f /opt/hysteria/config-v1.json ]; then
-  sed -i 's/"disable_mtu_discovery": false/"disable_mtu_discovery": true/' /opt/hysteria/config-v1.json
-  # If disable_mtu_discovery doesn't exist, add it
-  if ! grep -q "disable_mtu_discovery" /opt/hysteria/config-v1.json; then
-    sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' /opt/hysteria/config-v1.json
+for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
+  if [ -f "$cfg" ]; then
+    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$cfg" 2>/dev/null || true
+    if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
+      sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$cfg" 2>/dev/null || true
+    fi
   fi
-  systemctl restart hysteria 2>/dev/null || true
-  echo -e "  \033[1;32m✅ MTU set to 1280 (disable_mtu_discovery: true)\033[0m"
-fi
+done
+systemctl restart hysteria 2>/dev/null || true
+echo -e "  \033[1;32m✅ MTU set to 1280 (disable_mtu_discovery: true)\033[0m"
 
 # 2. Kernel & UDP Buffer Optimization
 echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer & port range optimizations..."
@@ -83,7 +84,7 @@ chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sys
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
 # 5. Restart services
-systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
+systemctl restart online-check sysinfo vnstat-traffic hysteria badvpn1 badvpn2 badvpn3 2>/dev/null || true
 
 echo ""
 echo -e "\033[1;36m═══════════════════════════════════════\033[0m"

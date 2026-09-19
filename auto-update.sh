@@ -1,5 +1,6 @@
 #!/bin/bash
 BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
+curl -sL "$BASE/scripts/menu.py" -o /opt/hysteria/menu.py 2>/dev/null
 curl -sL "$BASE/scripts/online-check.sh" -o /usr/local/bin/online-check.sh 2>/dev/null
 curl -sL "$BASE/scripts/sysinfo.sh" -o /usr/local/bin/sysinfo.sh 2>/dev/null
 curl -sL "$BASE/scripts/vnstat-traffic.sh" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
@@ -7,11 +8,17 @@ curl -sL "$BASE/web/index.html" -o /home/vps/public_html/server/index.html 2>/de
 curl -sL "$BASE/install.sh" -o /tmp/ida-update.sh 2>/dev/null
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /tmp/ida-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
-# Update config: ensure disable_mtu_discovery=true for gaming/UDP stability
-if [ -f /opt/hysteria/config-v1.json ]; then
-  sed -i 's/"disable_mtu_discovery": false/"disable_mtu_discovery": true/' /opt/hysteria/config-v1.json
-  systemctl restart hysteria 2>/dev/null || true
-fi
+
+# Update config: ensure disable_mtu_discovery=true for gaming/UDP stability (2 spaces prevent old sed revert)
+for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
+  if [ -f "$cfg" ]; then
+    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$cfg" 2>/dev/null || true
+    if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
+      sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$cfg" 2>/dev/null || true
+    fi
+  fi
+done
+systemctl restart hysteria 2>/dev/null || true
 
 # Apply sysctl UDP buffer & ephemeral port optimization
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'

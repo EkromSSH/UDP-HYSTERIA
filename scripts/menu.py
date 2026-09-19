@@ -424,16 +424,17 @@ def change_limit():
     bsep(); bot(); print(); time.sleep(2)
 
 def auto_fix_gaming():
-    # 1. Ensure disable_mtu_discovery=true for gaming stability
+    # 1. Ensure disable_mtu_discovery=true for gaming/UDP stability (2 spaces prevent old sed revert)
     try:
-        if os.path.exists(HYST_CONFIG):
-            with open(HYST_CONFIG, 'r') as f: content = f.read()
-            if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery"' not in content:
-                content = content.replace('"disable_mtu_discovery": false', '"disable_mtu_discovery": true')
-                if '"disable_mtu_discovery"' not in content:
-                    content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery": true\n}'
-                with open(HYST_CONFIG, 'w') as f: f.write(content)
-                subprocess.run("systemctl restart hysteria 2>/dev/null", shell=True)
+        for cfg in [HYST_CONFIG, "/opt/hysteria/config.json", "/etc/hysteria/config.json", "/etc/hysteria/config-v1.json"]:
+            if os.path.exists(cfg):
+                with open(cfg, 'r') as f: content = f.read()
+                if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery": true' in content or '"disable_mtu_discovery"' not in content:
+                    content = re.sub(r'"disable_mtu_discovery"\s*:\s*(false|true)', '"disable_mtu_discovery":  true', content)
+                    if '"disable_mtu_discovery"' not in content:
+                        content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery":  true\n}'
+                    with open(cfg, 'w') as f: f.write(content)
+                    subprocess.run("systemctl restart hysteria 2>/dev/null", shell=True)
     except: pass
 
     # 2. Ensure BadVPN (7100, 7200, 7300) is running for Roblox / game UDP gateway
@@ -458,14 +459,19 @@ def auto_fix_gaming():
 
 def update_dashboard():
     os.system("clear"); print(); box(); center(f"{G}\u21bb{NC} {BD}Update Scripts & Game Fix{NC}"); bsep()
-    bput(f"  {D}Running update script...{NC}")
+    bput(f"  {D}Running update script & applying game fixes...{NC}")
     bsep()
     try:
         subprocess.run("curl -sL 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?t='$(date +%s) | bash", shell=True)
     except Exception as e:
         print(f"  {R}Error: {e}{NC}")
     bsep(); bot(); print()
-    input(f"  {B}Press Enter to return to menu...{NC} ")
+    print(f"  {G}✅ Update completed! Reloading menu...{NC}")
+    time.sleep(2)
+    try:
+        os.execv(sys.executable, [sys.executable, "/opt/hysteria/menu.py"])
+    except:
+        input(f"  {B}Press Enter to return to menu...{NC} ")
 
 def uninstall_dashboard():
     os.system("clear"); print(); box(); center(f"{R}\u2716{NC} {BD}Uninstall Dashboard{NC}"); bsep()

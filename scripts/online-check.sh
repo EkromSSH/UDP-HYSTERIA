@@ -5,20 +5,22 @@
 #  - Outputs: $WWW_DIR/online_app.json
 # ===============================================
 
-set -u -o pipefail
-
 # ═══════════════════════════════════════════════
 # Self-healing: Game Fix (MTU 1280, BadVPN 7100/7200/7300, Sysctl)
 # ═══════════════════════════════════════════════
-if [ -f /opt/hysteria/config-v1.json ]; then
-  if grep -q '"disable_mtu_discovery": false' /opt/hysteria/config-v1.json 2>/dev/null; then
-    sed -i 's/"disable_mtu_discovery": false/"disable_mtu_discovery": true/' /opt/hysteria/config-v1.json
-    systemctl restart hysteria 2>/dev/null || true
-  elif ! grep -q 'disable_mtu_discovery' /opt/hysteria/config-v1.json 2>/dev/null; then
-    sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' /opt/hysteria/config-v1.json
-    systemctl restart hysteria 2>/dev/null || true
+for _cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
+  if [ -f "$_cfg" ]; then
+    if grep -q '"disable_mtu_discovery"[[:space:]]*:[[:space:]]*false' "$_cfg" 2>/dev/null || \
+       grep -q '"disable_mtu_discovery": true' "$_cfg" 2>/dev/null || \
+       ! grep -q 'disable_mtu_discovery' "$_cfg" 2>/dev/null; then
+      sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$_cfg" 2>/dev/null || true
+      if ! grep -q 'disable_mtu_discovery' "$_cfg" 2>/dev/null; then
+        sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$_cfg" 2>/dev/null || true
+      fi
+      systemctl restart hysteria 2>/dev/null || true
+    fi
   fi
-fi
+done
 
 if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   if [ ! -f /usr/sbin/badvpn ] || [ ! -s /usr/sbin/badvpn ]; then
