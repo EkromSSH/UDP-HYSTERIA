@@ -10,6 +10,7 @@ WEB_DIR = "/home/vps/public_html/server"
 WEB_PORT = 82
 SWAP_FILE = "/swapfile"
 SHOWON_CONF = "/etc/showon.conf"
+VERSION = "v2.3.0"
 
 # ══ Colors ══
 R = '\033[0;31m'; G = '\033[0;32m'; O = '\033[0;33m'
@@ -189,11 +190,12 @@ def show_menu():
     print()
     box()
     center(f"  {R}\u2588\u2588{O}\u2588\u2588{Y}\u2588\u2588{G}\u2588\u2588{C}\u2588\u2588{B}\u2588\u2588{M}\u2588\u2588{NC}  {WHT}IDA UDPHysteria{NC}  {R}\u2588\u2588{O}\u2588\u2588{Y}\u2588\u2588{G}\u2588\u2588{C}\u2588\u2588{B}\u2588\u2588{M}\u2588\u2588{NC}")
-    center(f"{D}Hysteria v1 Server Manager{NC}")
+    center(f"{D}Hysteria v1 Server Manager — {G}{VERSION}{NC}")
     bsep()
     LW = 14
     for label, val in [("Server IP", ip), ("Port", f"{p} (10000-65000)"), ("Auth", a if a else "-"),
                        ("Obfs", o if o else "-"), ("Status", f"{stt}  Up:{u}"),
+                       ("Version", f"{G}{VERSION}{NC} {D}(Gaming Fixed){NC}"),
                        ("Online", f"Total:{WHT}{total}{NC}  SSH:{WHT}{ssh}{NC}  V2R:{WHT}{v2r}{NC}  OVPN:{WHT}{ovpn}{NC}  UDP:{WHT}{udp}{NC}")]:
         bput(f"{D}{pad(label, LW)}{NC} : {val}")
     bput(f"  {R}\u258c{NC}{O}\u258c{NC}{Y}\u258c{NC}{G}\u258c{NC}{C}\u258c{NC}{B}\u258c{NC}{M}\u258c{NC}")

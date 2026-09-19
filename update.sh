@@ -2,7 +2,8 @@
 # ═══════════════════════════════════════════════════════
 # IDA UDPHysteria — Quick Update & Game Fix
 # ═══════════════════════════════════════════════════════
-echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria & Applying Game Fixes...\033[0m\n"
+VERSION="v2.3.0"
+echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Game Fixes...\033[0m\n"
 
 BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
 CACHE_BUST="?t=$(date +%s)"
@@ -90,8 +91,10 @@ systemctl restart online-check sysinfo vnstat-traffic hysteria badvpn1 badvpn2 b
 
 echo ""
 echo -e "\033[1;36m═══════════════════════════════════════\033[0m"
-echo -e "\033[1;32m  🎉 Update Completed Successfully!\033[0m"
+echo -e "\033[1;32m  🎉 Update Completed Successfully! (${VERSION})\033[0m"
 echo -e "\033[1;36m═══════════════════════════════════════\033[0m"
+echo "$VERSION" > /etc/ida-version 2>/dev/null || true
+echo "  Version  : ${VERSION} (Gaming Fix Applied)"
 echo "  Hysteria : $(systemctl is-active hysteria)"
 echo "  BadVPN 1 : $(systemctl is-active badvpn1) (port 7100)"
 echo "  BadVPN 2 : $(systemctl is-active badvpn2) (port 7200)"

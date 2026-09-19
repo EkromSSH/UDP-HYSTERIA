@@ -66,6 +66,7 @@ net.ipv4.ip_forward = 1
 EOF
   sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
 fi
+echo "v2.3.0" > /etc/ida-version 2>/dev/null || true
 
 # -------- Default config --------
 CONF="/etc/showon.conf"

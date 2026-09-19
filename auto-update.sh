@@ -61,5 +61,6 @@ EOF
 done
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
+echo "v2.3.0" > /etc/ida-version 2>/dev/null || true
 
 systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
