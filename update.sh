@@ -86,7 +86,44 @@ curl -sL "${BASE}/auto-update.sh${CACHE_BUST}" -o /opt/hysteria/auto-update.sh 2
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
-# 5. Restart services
+# 5. Ensure systemd services & restart
+if [ ! -f /etc/systemd/system/sysinfo.service ] || ! grep -q "\[Install\]" /etc/systemd/system/sysinfo.service 2>/dev/null; then
+  cat > /etc/systemd/system/sysinfo.service << 'EOF'
+[Unit]
+Description=System Info
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sysinfo.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
+if [ ! -f /etc/systemd/system/vnstat-traffic.service ] || ! grep -q "\[Install\]" /etc/systemd/system/vnstat-traffic.service 2>/dev/null; then
+  cat > /etc/systemd/system/vnstat-traffic.service << 'EOF'
+[Unit]
+Description=Traffic
+After=network.target vnstat.service
+Wants=vnstat.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vnstat-traffic.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable --now sysinfo vnstat-traffic 2>/dev/null || true
 systemctl restart online-check sysinfo vnstat-traffic hysteria badvpn1 badvpn2 badvpn3 2>/dev/null || true
 
 echo ""

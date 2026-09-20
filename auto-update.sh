@@ -63,4 +63,43 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 echo "v2.3.0" > /etc/ida-version 2>/dev/null || true
 
+# Ensure sysinfo & vnstat-traffic service definitions with [Install] section
+if [ ! -f /etc/systemd/system/sysinfo.service ] || ! grep -q "\[Install\]" /etc/systemd/system/sysinfo.service 2>/dev/null; then
+  cat > /etc/systemd/system/sysinfo.service << 'EOF'
+[Unit]
+Description=System Info
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sysinfo.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
+if [ ! -f /etc/systemd/system/vnstat-traffic.service ] || ! grep -q "\[Install\]" /etc/systemd/system/vnstat-traffic.service 2>/dev/null; then
+  cat > /etc/systemd/system/vnstat-traffic.service << 'EOF'
+[Unit]
+Description=Traffic
+After=network.target vnstat.service
+Wants=vnstat.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vnstat-traffic.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable --now sysinfo vnstat-traffic 2>/dev/null || true
 systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
+

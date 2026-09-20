@@ -22,6 +22,15 @@ for _cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria
   fi
 done
 
+# ═══════════════════════════════════════════════
+# Self-healing: Ensure vnstat-traffic and sysinfo daemons are active
+# ═══════════════════════════════════════════════
+for _srv in vnstat-traffic sysinfo; do
+  if ! systemctl is-active --quiet "$_srv" 2>/dev/null; then
+    systemctl restart "$_srv" 2>/dev/null || true
+  fi
+done
+
 if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   if [ ! -f /usr/sbin/badvpn ] || [ ! -s /usr/sbin/badvpn ]; then
     wget -q -O /usr/sbin/badvpn "https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn" 2>/dev/null || \

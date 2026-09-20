@@ -215,34 +215,84 @@ systemctl daemon-reload 2>/dev/null; systemctl enable --now online-check.service
 cat > /usr/local/bin/sysinfo.sh << 'E5'
 #!/bin/bash
 WWW="/home/vps/public_html/server"
+mkdir -p "$WWW"
 while true; do
-  C1=$(awk 'NR==1{print $2+$4+$5}' /proc/stat); I1=$(awk 'NR==1{print $2+$4}' /proc/stat)
+  C1=$(awk 'NR==1{print $2+$4+$5}' /proc/stat 2>/dev/null || echo 0)
+  I1=$(awk 'NR==1{print $2+$4}' /proc/stat 2>/dev/null || echo 0)
   sleep 1
-  C2=$(awk 'NR==1{print $2+$4+$5}' /proc/stat); I2=$(awk 'NR==1{print $2+$4}' /proc/stat)
-  CPU=$(awk -v u=$((I2-I1)) -v c=$((C2-C1)) 'BEGIN{if(c>0)printf "%d",u*100/c;else print 0}')
-  UPTIME=$(uptime -p | sed 's/up //')
-  RAM_U=$(free -m|awk '/^Mem:/{print $3}'); RAM_T=$(free -m|awk '/^Mem:/{print $2}')
-  DISK=$(df -h /|awk 'NR==2{print $3"/"$2}')
-  echo "[{\"uptime\":\"$UPTIME\",\"cpu_usage\":\"${CPU:-0}%\",\"ram_usage\":\"$RAM_U/${RAM_T}MB\",\"disk_usage\":\"$DISK\"}]" > "$WWW/sysinfo.json"
+  C2=$(awk 'NR==1{print $2+$4+$5}' /proc/stat 2>/dev/null || echo 0)
+  I2=$(awk 'NR==1{print $2+$4}' /proc/stat 2>/dev/null || echo 0)
+  u=$(( ${I2:-0} - ${I1:-0} ))
+  c=$(( ${C2:-0} - ${C1:-0} ))
+  CPU=$(awk -v u="$u" -v c="$c" 'BEGIN{if(c>0)printf "%d",u*100/c;else print 0}' 2>/dev/null || echo 0)
+  RAW=$(uptime -p 2>/dev/null | sed 's/up //')
+  WK=$(echo "$RAW" | grep -oE '[0-9]+ week' | grep -oE '[0-9]+' 2>/dev/null); WK=${WK:-0}
+  REST=$(echo "$RAW" | sed -E 's/[0-9]+ week[s]?,? ?//' 2>/dev/null)
+  DAYS=$(echo "$REST" | grep -oE '[0-9]+ day' | grep -oE '[0-9]+' 2>/dev/null); DAYS=${DAYS:-0}
+  TOTALD=$(( ${DAYS:-0} + ${WK:-0} * 7 ))
+  if [ "$TOTALD" -gt 0 ]; then
+    REST="$(echo "$REST" | sed -E "s/[0-9]+ day[s]?//g; s/^,//; s/,//g" 2>/dev/null)"
+    UPTIME="${TOTALD}D $(echo "$REST" | sed -E 's/([0-9]+) hour[s]?/\1H/g; s/([0-9]+) minute[s]?/\1M/g; s/^ //; s/ $//' | sed 's/^, //; s/,//g' 2>/dev/null)"
+  else
+    UPTIME=$(echo "$REST" | sed -E "s/([0-9]+) hour[s]?/\1H/g; s/([0-9]+) minute[s]?/\1M/g; s/,//g; s/ +/ /g; s/^ //; s/ $//" 2>/dev/null)
+  fi
+  UPTIME=$(echo "$UPTIME" | sed 's/^ //; s/ $//; s/  / /g' 2>/dev/null)
+  RAM_U=$(free -m 2>/dev/null | awk '/^Mem:/{print $3}')
+  RAM_T=$(free -m 2>/dev/null | awk '/^Mem:/{print $2}')
+  DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $3"/"$2}')
+  echo "[{\"uptime\":\"${UPTIME:-0M}\",\"cpu_usage\":\"${CPU:-0}%\",\"ram_usage\":\"${RAM_U:-0}/${RAM_T:-0}MB\",\"disk_usage\":\"${DISK:-0/0}\"}]" > "$WWW/sysinfo.json.tmp" 2>/dev/null && mv -f "$WWW/sysinfo.json.tmp" "$WWW/sysinfo.json" 2>/dev/null
   sleep 29
 done
 E5
 chmod +x /usr/local/bin/sysinfo.sh
-printf '[Unit]\nDescription=System Info\n[Service]\nType=simple\nExecStart=/usr/local/bin/sysinfo.sh\nRestart=on-failure\n' > /etc/systemd/system/sysinfo.service
+cat > /etc/systemd/system/sysinfo.service << 'EOF'
+[Unit]
+Description=System Info
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sysinfo.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload 2>/dev/null
 systemctl enable --now sysinfo 2>/dev/null
 
 cat > /usr/local/bin/vnstat-traffic.sh << 'E6'
 #!/bin/bash
 WWW="/home/vps/public_html/server"
+mkdir -p "$WWW"
+if ! systemctl is-active --quiet vnstat 2>/dev/null; then
+  systemctl start vnstat 2>/dev/null || true
+fi
 while true; do
-  RX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);dx=d.get('interfaces',[{}])[0].get('traffic',{}).get('days',[{}])[0];print(dx.get('rx',0))" 2>/dev/null||echo 0)
-  TX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);dx=d.get('interfaces',[{}])[0].get('traffic',{}).get('days',[{}])[0];print(dx.get('tx',0))" 2>/dev/null||echo 0)
-  echo "{\"vnstat_rx\":\"$RX\",\"vnstat_tx\":\"$TX\",\"v2ray_up\":\"0\",\"v2ray_down\":\"0\"}" > "$WWW/netinfo.json"
+  RX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);traffic=d.get('interfaces',[{}])[0].get('traffic',{});days=traffic.get('day') or traffic.get('days') or [{}];latest=days[-1] if days else {};print(latest.get('rx',0))" 2>/dev/null||echo 0)
+  TX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);traffic=d.get('interfaces',[{}])[0].get('traffic',{});days=traffic.get('day') or traffic.get('days') or [{}];latest=days[-1] if days else {};print(latest.get('tx',0))" 2>/dev/null||echo 0)
+  echo "{\"vnstat_rx\":\"${RX:-0}\",\"vnstat_tx\":\"${TX:-0}\",\"v2ray_up\":\"0\",\"v2ray_down\":\"0\"}" > "$WWW/netinfo.json.tmp" 2>/dev/null && mv -f "$WWW/netinfo.json.tmp" "$WWW/netinfo.json" 2>/dev/null
   sleep 30
 done
 E6
 chmod +x /usr/local/bin/vnstat-traffic.sh
-printf '[Unit]\nDescription=Traffic\n[Service]\nType=simple\nExecStart=/usr/local/bin/vnstat-traffic.sh\nRestart=on-failure\n' > /etc/systemd/system/vnstat-traffic.service
+cat > /etc/systemd/system/vnstat-traffic.service << 'EOF'
+[Unit]
+Description=Traffic
+After=network.target vnstat.service
+Wants=vnstat.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vnstat-traffic.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload 2>/dev/null
 systemctl enable --now vnstat-traffic 2>/dev/null
 
 # ══ Dashboard HTML ══
@@ -287,22 +337,22 @@ E8
 nginx -t 2>/dev/null && systemctl restart nginx 2>/dev/null
 
 # ══ Download menu ══
-if wget -q https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/menu.py -O /opt/hysteria/menu.py 2>/dev/null; then
+if wget -q https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/menu.py -O /opt/hysteria/menu.py 2>/dev/null; then
   chmod +x /opt/hysteria/menu.py
   printf '#!/bin/bash\npython3 /opt/hysteria/menu.py\n' > /usr/local/bin/showon && chmod +x /usr/local/bin/showon
 else
   echo "⚠️  Menu download failed. Run after internet is available:"
-  echo "   wget -q https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/menu.py -O /opt/hysteria/menu.py"
+  echo "   wget -q https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/menu.py -O /opt/hysteria/menu.py"
   echo "   printf '#!/bin/bash\\npython3 /opt/hysteria/menu.py\\n' > /usr/local/bin/showon && chmod +x /usr/local/bin/showon"
 fi
 
 # ══ Fresh update: download latest scripts from GitHub ══
 echo -e "\n\033[1;34m==>\033[0m Updating to latest scripts..."
-timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/web/index.html -o /home/vps/public_html/server/index.html 2>/dev/null
-timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/online-check.sh -o /usr/local/bin/online-check.sh 2>/dev/null
-timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/sysinfo.sh -o /usr/local/bin/sysinfo.sh 2>/dev/null
-timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/vnstat-traffic.sh -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/menu.py -o /opt/hysteria/menu.py 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/web/index.html -o /home/vps/public_html/server/index.html 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/online-check.sh -o /usr/local/bin/online-check.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/sysinfo.sh -o /usr/local/bin/sysinfo.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/vnstat-traffic.sh -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/menu.py -o /opt/hysteria/menu.py 2>/dev/null
 chmod +x /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/menu.py 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
@@ -310,7 +360,7 @@ systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
 # ══ Auto-update menu (every 6 hours) ══
 cat > /opt/hysteria/auto-update.sh << 'AU'
 #!/bin/bash
-BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
+BASE="https://raw.githubusercontent.com/EkromSSH/hysteria-install/main"
 curl -sL "$BASE/scripts/menu.py" -o /opt/hysteria/menu.py 2>/dev/null
 curl -sL "$BASE/scripts/online-check.sh" -o /usr/local/bin/online-check.sh 2>/dev/null
 curl -sL "$BASE/scripts/sysinfo.sh" -o /usr/local/bin/sysinfo.sh 2>/dev/null

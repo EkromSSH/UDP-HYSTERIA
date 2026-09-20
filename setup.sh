@@ -140,20 +140,41 @@ printf '[Unit]\nDescription=Online Check Timer\n[Timer]\nOnBootSec=10\nOnUnitAct
 systemctl enable --now online-check.timer 2>/dev/null
 wget -q https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/sysinfo.sh -O /usr/local/bin/sysinfo.sh
 chmod +x /usr/local/bin/sysinfo.sh
-printf '[Unit]\nDescription=System Info\n[Service]\nType=simple\nExecStart=/usr/local/bin/sysinfo.sh\nRestart=on-failure\n' > /etc/systemd/system/sysinfo.service
+cat > /etc/systemd/system/sysinfo.service << 'EOF'
+[Unit]
+Description=System Info
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sysinfo.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload 2>/dev/null
 systemctl enable --now sysinfo 2>/dev/null
-cat > /usr/local/bin/vnstat-traffic.sh << 'E6'
-#!/bin/bash
-WWW="/home/vps/public_html/server"
-while true; do
-  RX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);dx=d.get('interfaces',[{}])[0].get('traffic',{}).get('days',[{}])[0];print(dx.get('rx',0))" 2>/dev/null||echo 0)
-  TX=$(vnstat --json d 2>/dev/null|python3 -c "import json,sys;d=json.load(sys.stdin);dx=d.get('interfaces',[{}])[0].get('traffic',{}).get('days',[{}])[0];print(dx.get('tx',0))" 2>/dev/null||echo 0)
-  echo "{\"vnstat_rx\":\"$RX\",\"vnstat_tx\":\"$TX\",\"v2ray_up\":\"0\",\"v2ray_down\":\"0\"}" > "$WWW/netinfo.json"
-  sleep 30
-done
-E6
+
+wget -q https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/scripts/vnstat-traffic.sh -O /usr/local/bin/vnstat-traffic.sh
 chmod +x /usr/local/bin/vnstat-traffic.sh
-printf '[Unit]\nDescription=Traffic\n[Service]\nType=simple\nExecStart=/usr/local/bin/vnstat-traffic.sh\nRestart=on-failure\n' > /etc/systemd/system/vnstat-traffic.service
+cat > /etc/systemd/system/vnstat-traffic.service << 'EOF'
+[Unit]
+Description=Traffic
+After=network.target vnstat.service
+Wants=vnstat.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vnstat-traffic.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload 2>/dev/null
 systemctl enable --now vnstat-traffic 2>/dev/null
 wget -q https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/web/index.html -O /home/vps/public_html/server/index.html
 cat > /etc/nginx/conf.d/dashboard.conf << 'E8'
