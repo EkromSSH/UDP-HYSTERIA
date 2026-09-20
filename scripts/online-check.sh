@@ -64,7 +64,7 @@ BV
   systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 fi
 
-if [ ! -f /etc/sysctl.d/99-hysteria.conf ]; then
+if [ ! -f /etc/sysctl.d/99-hysteria.conf ] || ! grep -q "nf_conntrack_max" /etc/sysctl.d/99-hysteria.conf 2>/dev/null; then
   cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 net.core.rmem_max = 8388608
 net.core.wmem_max = 8388608
@@ -72,10 +72,28 @@ net.core.rmem_default = 8388608
 net.core.wmem_default = 8388608
 net.ipv4.ip_local_port_range = 1024 9999
 net.ipv4.ip_forward = 1
+
+# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+net.netfilter.nf_conntrack_max = 1048576
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_tcp_timeout_established = 1800
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
+
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
   sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
+  echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
+  echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
 fi
-echo "v2.3.0" > /etc/ida-version 2>/dev/null || true
+echo "v2.3.1" > /etc/ida-version 2>/dev/null || true
 
 # -------- Default config --------
 CONF="/etc/showon.conf"

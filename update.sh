@@ -2,27 +2,30 @@
 # ═══════════════════════════════════════════════════════
 # IDA UDPHysteria — Quick Update & Game Fix
 # ═══════════════════════════════════════════════════════
-VERSION="v2.3.0"
-echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Game Fixes...\033[0m\n"
+VERSION="v2.3.1"
+echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
 
 BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
 CACHE_BUST="?t=$(date +%s)"
 
-# 1. Update MTU for gaming (disable_mtu_discovery:  true with 2 spaces)
-echo -e "\033[1;34m==>\033[0m Fixing MTU for Mobile & Gaming..."
+# 1. Update MTU & IPv4 Resolve for gaming and mobile connectivity
+echo -e "\033[1;34m==>\033[0m Fixing MTU & Resolve Preference for Mobile & Gaming..."
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
     sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$cfg" 2>/dev/null || true
     if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
       sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$cfg" 2>/dev/null || true
     fi
+    if ! grep -q "resolve_preference" "$cfg" 2>/dev/null; then
+      sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
+    fi
   fi
 done
 systemctl restart hysteria 2>/dev/null || true
-echo -e "  \033[1;32m✅ MTU set to 1280 (disable_mtu_discovery: true)\033[0m"
+echo -e "  \033[1;32m✅ MTU (1280) & resolve_preference (4) applied\033[0m"
 
-# 2. Kernel & UDP Buffer Optimization
-echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer & port range optimizations..."
+# 2. Kernel & UDP Buffer & Conntrack Optimization
+echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer, Conntrack & IPv6 optimizations..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for Gaming & High Throughput
 net.core.rmem_max = 8388608
@@ -35,9 +38,28 @@ net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+net.netfilter.nf_conntrack_max = 1048576
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_tcp_timeout_established = 1800
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
+
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
 sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
-echo -e "  \033[1;32m✅ Sysctl UDP Buffer 8MB applied\033[0m"
+
+echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
+echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
+echo -e "  \033[1;32m✅ Sysctl UDP Buffer 8MB, Conntrack 1M & IPv6 disabled applied\033[0m"
 
 # 3. Install & Start BadVPN udpgw (7100, 7200, 7300) for games (Roblox Error 279, etc.)
 echo -e "\033[1;34m==>\033[0m Checking & Installing BadVPN-udpgw (7100, 7200, 7300)..."

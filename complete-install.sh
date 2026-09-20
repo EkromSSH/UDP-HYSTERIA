@@ -41,6 +41,7 @@ cat > /opt/hysteria/config-v1.json << EOF
   "auth_str": "${AUTH}",
   "recv_window_conn": 20971520,
   "recv_window_client": 41943040,
+  "resolve_preference": "4",
   "disable_mtu_discovery": true
 }
 EOF
@@ -76,8 +77,26 @@ net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+net.netfilter.nf_conntrack_max = 1048576
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_tcp_timeout_established = 1800
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
+
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
 sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
+echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
+echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
 
 # ══ BadVPN udpgw for Gaming (7100, 7200, 7300) ══
 echo -e "\n\033[1;34m==>\033[0m Installing BadVPN udpgw for Gaming..."

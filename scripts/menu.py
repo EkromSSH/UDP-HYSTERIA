@@ -10,7 +10,7 @@ WEB_DIR = "/home/vps/public_html/server"
 WEB_PORT = 82
 SWAP_FILE = "/swapfile"
 SHOWON_CONF = "/etc/showon.conf"
-VERSION = "v2.3.0"
+VERSION = "v2.3.1"
 
 # ══ Colors ══
 R = '\033[1;31m'; G = '\033[1;32m'; O = '\033[1;33m'
@@ -1324,10 +1324,16 @@ def auto_fix_gaming():
         for cfg in [HYST_CONFIG, "/opt/hysteria/config.json", "/etc/hysteria/config.json", "/etc/hysteria/config-v1.json"]:
             if os.path.exists(cfg):
                 with open(cfg, 'r') as f: content = f.read()
+                changed = False
                 if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery": true' in content or '"disable_mtu_discovery"' not in content:
                     content = re.sub(r'"disable_mtu_discovery"\s*:\s*(false|true)', '"disable_mtu_discovery":  true', content)
                     if '"disable_mtu_discovery"' not in content:
                         content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery":  true\n}'
+                    changed = True
+                if '"resolve_preference"' not in content:
+                    content = content.rstrip().rstrip('}') + ',\n  "resolve_preference": "4"\n}'
+                    changed = True
+                if changed:
                     with open(cfg, 'w') as f: f.write(content)
                     subprocess.run("systemctl restart hysteria 2>/dev/null", shell=True)
     except: pass
@@ -1345,10 +1351,38 @@ def auto_fix_gaming():
     except: pass
 
     try:
-        if not os.path.exists("/etc/sysctl.d/99-hysteria.conf"):
-            cfg = "net.core.rmem_max = 8388608\nnet.core.wmem_max = 8388608\nnet.core.rmem_default = 8388608\nnet.core.wmem_default = 8388608\nnet.ipv4.ip_local_port_range = 1024 9999\nnet.ipv4.ip_forward = 1\n"
-            with open("/etc/sysctl.d/99-hysteria.conf", "w") as f: f.write(cfg)
-            subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf 2>/dev/null", shell=True)
+        cfg = """# UDP Buffer Optimization for Gaming & High Throughput
+net.core.rmem_max = 8388608
+net.core.wmem_max = 8388608
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+
+# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
+net.ipv4.ip_local_port_range = 1024 9999
+
+# Enable IP forwarding
+net.ipv4.ip_forward = 1
+
+# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+net.netfilter.nf_conntrack_max = 1048576
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_tcp_timeout_established = 1800
+net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
+net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
+
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+"""
+        with open("/etc/sysctl.d/99-hysteria.conf", "w") as f: f.write(cfg)
+        subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf 2>/dev/null", shell=True)
+        with open("/etc/modprobe.d/nf_conntrack.conf", "w") as f: f.write("options nf_conntrack hashsize=262144\n")
+        subprocess.run("echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true", shell=True)
     except: pass
 
 def update_dashboard():
