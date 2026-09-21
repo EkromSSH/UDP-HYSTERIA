@@ -1380,7 +1380,7 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 """
         with open("/etc/sysctl.d/99-hysteria.conf", "w") as f: f.write(cfg)
-        subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf 2>/dev/null", shell=True)
+        subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1", shell=True)
         with open("/etc/modprobe.d/nf_conntrack.conf", "w") as f: f.write("options nf_conntrack hashsize=262144\n")
         subprocess.run("echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true", shell=True)
     except: pass
