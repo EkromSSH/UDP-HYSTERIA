@@ -104,12 +104,13 @@ echo -e "  \033[1;32m✅ BadVPN udpgw 7100, 7200, 7300 active\033[0m"
 
 # 4. Download latest scripts from GitHub
 echo -e "\033[1;34m==>\033[0m Downloading latest scripts & menu..."
-curl -sL "${BASE}/scripts/menu.py${CACHE_BUST}" -o /opt/hysteria/menu.py 2>/dev/null
-curl -sL "${BASE}/scripts/online-check.sh${CACHE_BUST}" -o /usr/local/bin/online-check.sh 2>/dev/null
-curl -sL "${BASE}/scripts/sysinfo.sh${CACHE_BUST}" -o /usr/local/bin/sysinfo.sh 2>/dev/null
-curl -sL "${BASE}/scripts/vnstat-traffic.sh${CACHE_BUST}" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-curl -sL "${BASE}/web/index.html${CACHE_BUST}" -o /home/vps/public_html/server/index.html 2>/dev/null
-curl -sL "${BASE}/auto-update.sh${CACHE_BUST}" -o /opt/hysteria/auto-update.sh 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/menu.py?nocache=$(date +%s%N)" -o /opt/hysteria/menu.py 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/online-check.sh?nocache=$(date +%s%N)" -o /usr/local/bin/online-check.sh 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/sysinfo.sh?nocache=$(date +%s%N)" -o /usr/local/bin/sysinfo.sh 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/vnstat-traffic.sh?nocache=$(date +%s%N)" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/web/index.html?nocache=$(date +%s%N)" -o /home/vps/public_html/server/index.html 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/auto-update.sh?nocache=$(date +%s%N)" -o /opt/hysteria/auto-update.sh 2>/dev/null
+curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/version.txt?nocache=$(date +%s%N)" -o /opt/hysteria/version 2>/dev/null
 
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
@@ -159,6 +160,7 @@ echo -e "\033[1;36m════════════════════�
 echo -e "\033[1;32m  🎉 Update Completed Successfully! (${VERSION})\033[0m"
 echo -e "\033[1;36m═══════════════════════════════════════\033[0m"
 echo "$VERSION" > /etc/ida-version 2>/dev/null || true
+echo "$VERSION" > /opt/hysteria/version 2>/dev/null || true
 echo "  Version  : ${VERSION} (Gaming Fix Applied)"
 echo "  Hysteria : $(systemctl is-active hysteria)"
 echo "  BadVPN 1 : $(systemctl is-active badvpn1) (port 7100)"
