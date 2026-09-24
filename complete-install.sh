@@ -35,12 +35,13 @@ cat > /opt/hysteria/config-v1.json << EOF
   "protocol": "udp",
   "cert": "/opt/hysteria/certs/server.crt",
   "key": "/opt/hysteria/certs/server.key",
-  "up_mbps": 2000,
-  "down_mbps": 2000,
+  "up_mbps": 100,
+  "down_mbps": 100,
   "obfs": "${OBFS}",
   "auth_str": "${AUTH}",
-  "recv_window_conn": 20971520,
-  "recv_window_client": 41943040,
+  "recv_window_conn": 2097152,
+  "recv_window_client": 8388608,
+  "max_conn_client": 1024,
   "resolve_preference": "4",
   "disable_mtu_discovery": true
 }
@@ -66,17 +67,21 @@ EOF
 # ══ Kernel & UDP Buffer Optimization ══
 echo -e "\n\033[1;34m==>\033[0m Optimizing system UDP buffers & network..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
-# UDP Buffer Optimization for Gaming & High Throughput
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 
-# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
-net.ipv4.ip_local_port_range = 1024 9999
+# Ephemeral port range for outbound connections (prevents port exhaustion)
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# BBR Congestion Control & Fair Queuing for UDP/TCP stability
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
@@ -113,7 +118,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000

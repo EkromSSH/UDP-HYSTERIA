@@ -88,10 +88,11 @@ cat > /opt/hysteria/config-v1.json << EOF
   "down_mbps": 100,
   "obfs": "${OBFS}",
   "auth_str": "${AUTH}",
-  "recv_window_conn": 20971520,
-  "recv_window_client": 41943040,
+  "recv_window_conn": 2097152,
+  "recv_window_client": 8388608,
+  "max_conn_client": 1024,
   "resolve_preference": "4",
-  "disable_mtu_discovery":  true
+  "disable_mtu_discovery": true
 }
 EOF
 
@@ -117,17 +118,21 @@ E2
 # ══ Kernel & UDP Buffer Optimization ══
 echo -e "\n\033[1;34m==>\033[0m Optimizing system UDP buffers & network..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
-# UDP Buffer Optimization for Gaming & High Throughput
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 
-# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
-net.ipv4.ip_local_port_range = 1024 9999
+# Ephemeral port range for outbound connections (prevents port exhaustion)
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# BBR Congestion Control & Fair Queuing for UDP/TCP stability
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
@@ -164,7 +169,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -387,33 +392,39 @@ curl -sL "$BASE/scripts/vnstat-traffic.sh" -o /usr/local/bin/vnstat-traffic.sh 2
 curl -sL "$BASE/web/index.html" -o /home/vps/public_html/server/index.html 2>/dev/null
 curl -sL "$BASE/install.sh" -o /tmp/ida-update.sh 2>/dev/null
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /tmp/ida-update.sh 2>/dev/null
-# Update config: ensure disable_mtu_discovery=true for gaming/UDP stability & resolve_preference=4 to prevent IPv6 timeout
+# Update config: ensure disable_mtu_discovery=true for gaming/UDP stability, low-RAM mobile buffer & resolve_preference=4
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
-    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$cfg" 2>/dev/null || true
+    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
     if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
-      sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$cfg" 2>/dev/null || true
+      sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' "$cfg" 2>/dev/null || true
     fi
     if ! grep -q "resolve_preference" "$cfg" 2>/dev/null; then
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
     fi
+    sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
+    sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
   fi
 done
 systemctl restart hysteria 2>/dev/null || true
 
-# Apply sysctl UDP buffer, conntrack & ephemeral port optimization
+# Apply sysctl UDP buffer, conntrack, BBR & ephemeral port optimization
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
-# UDP Buffer Optimization for Gaming & High Throughput
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 
-# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
-net.ipv4.ip_local_port_range = 1024 9999
+# Ephemeral port range for outbound connections (prevents port exhaustion)
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# BBR Congestion Control & Fair Queuing for UDP/TCP stability
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
@@ -443,8 +454,7 @@ fi
 
 for p in 7100 7200 7300; do
   idx=$(( (p - 7000) / 100 ))
-  if [ ! -f /etc/systemd/system/badvpn${idx}.service ]; then
-    cat > /etc/systemd/system/badvpn${idx}.service << EOF
+  cat > /etc/systemd/system/badvpn${idx}.service << EOF
 [Unit]
 Description=UDP ${p}
 After=syslog.target network-online.target
@@ -452,7 +462,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -461,8 +471,9 @@ LimitNOFILE=1000000
 [Install]
 WantedBy=multi-user.target
 EOF
-  fi
 done
+systemctl daemon-reload
+systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 

@@ -1325,13 +1325,19 @@ def auto_fix_gaming():
             if os.path.exists(cfg):
                 with open(cfg, 'r') as f: content = f.read()
                 changed = False
-                if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery": true' in content or '"disable_mtu_discovery"' not in content:
-                    content = re.sub(r'"disable_mtu_discovery"\s*:\s*(false|true)', '"disable_mtu_discovery":  true', content)
+                if '"disable_mtu_discovery": false' in content or '"disable_mtu_discovery"' not in content:
+                    content = re.sub(r'"disable_mtu_discovery"\s*:\s*(false|true)', '"disable_mtu_discovery": true', content)
                     if '"disable_mtu_discovery"' not in content:
-                        content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery":  true\n}'
+                        content = content.rstrip().rstrip('}') + ',\n  "disable_mtu_discovery": true\n}'
                     changed = True
                 if '"resolve_preference"' not in content:
                     content = content.rstrip().rstrip('}') + ',\n  "resolve_preference": "4"\n}'
+                    changed = True
+                if '20971520' in content:
+                    content = content.replace('20971520', '2097152')
+                    changed = True
+                if '41943040' in content:
+                    content = content.replace('41943040', '8388608')
                     changed = True
                 if changed:
                     with open(cfg, 'w') as f: f.write(content)
@@ -1345,23 +1351,27 @@ def auto_fix_gaming():
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 500\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass
 
     try:
-        cfg = """# UDP Buffer Optimization for Gaming & High Throughput
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+        cfg = """# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 
-# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
-net.ipv4.ip_local_port_range = 1024 9999
+# Ephemeral port range for outbound connections (prevents port exhaustion)
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# BBR Congestion Control & Fair Queuing for UDP/TCP stability
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576

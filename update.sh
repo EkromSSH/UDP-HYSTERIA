@@ -2,42 +2,48 @@
 # ═══════════════════════════════════════════════════════
 # IDA UDPHysteria — Quick Update & Game Fix
 # ═══════════════════════════════════════════════════════
-VERSION="v2.3.1"
+VERSION="v2.3.2"
 echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
 
 BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
 CACHE_BUST="?t=$(date +%s)"
 
-# 1. Update MTU & IPv4 Resolve for gaming and mobile connectivity
-echo -e "\033[1;34m==>\033[0m Fixing MTU & Resolve Preference for Mobile & Gaming..."
+# 1. Update MTU, Mobile Buffer & IPv4 Resolve for gaming and mobile connectivity
+echo -e "\033[1;34m==>\033[0m Fixing MTU, Low-RAM Buffer & Resolve Preference for Mobile & Gaming..."
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
-    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery":  true/' "$cfg" 2>/dev/null || true
+    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
     if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
-      sed -i 's/}$/,\n  "disable_mtu_discovery":  true\n}/' "$cfg" 2>/dev/null || true
+      sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' "$cfg" 2>/dev/null || true
     fi
     if ! grep -q "resolve_preference" "$cfg" 2>/dev/null; then
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
     fi
+    sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
+    sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
   fi
 done
 systemctl restart hysteria 2>/dev/null || true
-echo -e "  \033[1;32m✅ MTU (1280) & resolve_preference (4) applied\033[0m"
+echo -e "  \033[1;32m✅ MTU (1280), Mobile Buffer (2M/8M) & resolve_preference (4) applied\033[0m"
 
 # 2. Kernel & UDP Buffer & Conntrack Optimization
-echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer, Conntrack & IPv6 optimizations..."
+echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer, Conntrack, BBR & IPv6 optimizations..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
-# UDP Buffer Optimization for Gaming & High Throughput
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 
-# Ephemeral port range to prevent collision with Hysteria port hopping (10000-65000)
-net.ipv4.ip_local_port_range = 1024 9999
+# Ephemeral port range for outbound connections (prevents port exhaustion)
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
+
+# BBR Congestion Control & Fair Queuing for UDP/TCP stability
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
@@ -59,7 +65,7 @@ sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
 
 echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
 echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
-echo -e "  \033[1;32m✅ Sysctl UDP Buffer 8MB, Conntrack 1M & IPv6 disabled applied\033[0m"
+echo -e "  \033[1;32m✅ Sysctl UDP Buffer 16MB, BBR+FQ, Conntrack 1M & IPv6 disabled applied\033[0m"
 
 # 3. Install & Start BadVPN udpgw (7100, 7200, 7300) for games (Roblox Error 279, etc.)
 echo -e "\033[1;34m==>\033[0m Checking & Installing BadVPN-udpgw (7100, 7200, 7300)..."
@@ -81,7 +87,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
