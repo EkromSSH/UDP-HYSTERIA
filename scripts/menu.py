@@ -10,7 +10,18 @@ WEB_DIR = "/home/vps/public_html/server"
 WEB_PORT = 82
 SWAP_FILE = "/swapfile"
 SHOWON_CONF = "/etc/showon.conf"
-VERSION = "v2.3.1"
+
+def get_version():
+    for vpath in ["/etc/ida-version", "/opt/hysteria/version"]:
+        if os.path.exists(vpath):
+            try:
+                with open(vpath, "r") as f:
+                    v = f.read().strip()
+                    if v: return v
+            except: pass
+    return "v2.3.2"
+
+VERSION = get_version()
 
 # ══ Colors ══
 R = '\033[1;31m'; G = '\033[1;32m'; O = '\033[1;33m'
@@ -289,7 +300,7 @@ def is_web_running():
 # ══ Main Menu ══
 def show_menu():
     p, a, o = read_config(); ip = get_ip(); st = get_status()
-    u = get_uptime()
+    u = get_uptime(); ver = get_version()
     ssh = count_ssh(); v2r = count_v2ray(); ovpn = count_openvpn(); udp = count_udp()
     total = ssh + v2r + ovpn + udp
     stt = f"{G}ONLINE{NC}" if st=="active" else f"{R}OFFLINE{NC}"
@@ -298,12 +309,12 @@ def show_menu():
     print()
     box()
     center(f"  {R}\u2588\u2588{O}\u2588\u2588{Y}\u2588\u2588{G}\u2588\u2588{C}\u2588\u2588{B}\u2588\u2588{M}\u2588\u2588{NC}  {WHT}IDA UDPHysteria{NC}  {R}\u2588\u2588{O}\u2588\u2588{Y}\u2588\u2588{G}\u2588\u2588{C}\u2588\u2588{B}\u2588\u2588{M}\u2588\u2588{NC}")
-    center(f"{D}Hysteria v1 Server Manager — {G}{VERSION}{NC}")
+    center(f"{D}Hysteria v1 Server Manager — {G}{ver}{NC}")
     bsep()
     LW = 14
     for label, val in [("Server IP", ip), ("Port", f"{p} (10000-65000)"), ("Auth", a if a else "-"),
                        ("Obfs", o if o else "-"), ("Status", f"{stt}  Up:{u}"),
-                       ("Version", f"{G}{VERSION}{NC} {D}(Gaming Fixed){NC}"),
+                       ("Version", f"{G}{ver}{NC} {D}(Gaming Fixed){NC}"),
                        ("Online", f"Total:{WHT}{total}{NC}  SSH:{WHT}{ssh}{NC}  V2R:{WHT}{v2r}{NC}  OVPN:{WHT}{ovpn}{NC}  UDP:{WHT}{udp}{NC}")]:
         bput(f"{D}{pad(label, LW)}{NC} : {val}")
     bput(f"  {R}\u258c{NC}{O}\u258c{NC}{Y}\u258c{NC}{G}\u258c{NC}{C}\u258c{NC}{B}\u258c{NC}{M}\u258c{NC}")
@@ -1401,9 +1412,9 @@ def update_dashboard():
     bput("")
     box_section("UPDATE SPECIFICATION")
     bput("")
-    box_kv("Current Version", VERSION, 16, G)
+    box_kv("Current Version", get_version(), 16, G)
     box_kv("Target Repo", "EkromSSH/UDP-HYSTERIA", 16)
-    box_kv("Gaming Features", "BadVPN 7100/7200/7300, MTU, Sysctl 8MB", 16, C)
+    box_kv("Gaming Features", "BadVPN 7100/7200/7300, MTU, Sysctl 16MB & BBR", 16, C)
     bput("")
     box_info("Updating will fetch the latest scripts and apply all game fixes.")
     bput("")
@@ -1416,7 +1427,7 @@ def update_dashboard():
     box_header("UPDATING SYSTEM", "Downloading & Applying Fixes")
     bput("")
     box_info("Running update script from GitHub repository...")
-    box_info("Applying kernel 8MB UDP buffer & MTU 1280...")
+    box_info("Applying kernel 16MB UDP buffer, BBR & MTU 1280...")
     box_info("Verifying BadVPN Roblox / Game gateways...")
     bput("")
     box_footer()
@@ -1428,6 +1439,7 @@ def update_dashboard():
         
     auto_fix_gaming()
     
+    updated_ver = get_version()
     os.system("clear"); print()
     box_header("UPDATE COMPLETED", "System Up to Date")
     bput("")
@@ -1435,9 +1447,9 @@ def update_dashboard():
     bput("")
     box_section("SYSTEM STATUS")
     bput("")
-    box_kv("Current Version", VERSION, 16, G)
+    box_kv("Current Version", updated_ver, 16, G)
     box_kv("Gaming Gateways", f"{G}[ OK ] 7100/7200/7300 Active{NC}", 16)
-    box_kv("Kernel Buffer", f"{G}[ OK ] 8 MB UDP Buffer{NC}", 16)
+    box_kv("Kernel Buffer", f"{G}[ OK ] 16 MB UDP Buffer & BBR{NC}", 16)
     bput("")
     box_footer()
     press_enter("Press Enter to reload menu...")

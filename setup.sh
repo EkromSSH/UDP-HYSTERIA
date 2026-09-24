@@ -135,8 +135,10 @@ iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 systemctl daemon-reload && systemctl enable hysteria && systemctl restart hysteria
 sleep 3
 systemctl is-active hysteria && echo "✅ Hysteria: active" || echo "❌ Hysteria: failed"
+echo "v2.3.2" > /etc/ida-version 2>/dev/null || true
+echo "v2.3.2" > /opt/hysteria/version 2>/dev/null || true
 cat > /etc/showon.conf << E3
-VERSION="V.1.0.8"
+VERSION="V.2.3.2"
 WWW_DIR="/home/vps/public_html/server"
 LIMIT=50
 NET_IFACE="eth0"

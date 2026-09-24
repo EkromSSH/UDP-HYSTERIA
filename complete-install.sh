@@ -144,8 +144,10 @@ systemctl daemon-reload && systemctl enable hysteria && systemctl restart hyster
 sleep 3
 systemctl is-active hysteria && echo "✅ Hysteria: active" || echo "❌ Hysteria: failed"
 
+echo "v2.3.2" > /etc/ida-version 2>/dev/null || true
+echo "v2.3.2" > /opt/hysteria/version 2>/dev/null || true
 cat > /etc/showon.conf << EOF
-VERSION="V.1.0.8"
+VERSION="V.2.3.2"
 WWW_DIR="/home/vps/public_html/server"
 LIMIT=50
 DEBUG_LOG="/var/log/showon-debug.log"
