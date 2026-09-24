@@ -5,9 +5,6 @@
 VERSION="v2.3.2"
 echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
 
-BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
-CACHE_BUST="?t=$(date +%s)"
-
 # 1. Update MTU, Mobile Buffer & IPv4 Resolve for gaming and mobile connectivity
 echo -e "\033[1;34m==>\033[0m Fixing MTU, Low-RAM Buffer & Resolve Preference for Mobile & Gaming..."
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
@@ -102,15 +99,25 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 echo -e "  \033[1;32m✅ BadVPN udpgw 7100, 7200, 7300 active\033[0m"
 
-# 4. Download latest scripts from GitHub
+# 4. Download latest scripts from GitHub (API-first to bypass CDN cache)
+fetch_raw() {
+  local repo="EkromSSH/UDP-HYSTERIA"
+  local path="$1"
+  local out="$2"
+  if curl -sL -H "Accept: application/vnd.github.v3.raw" "https://api.github.com/repos/${repo}/contents/${path}" -o "$out" 2>/dev/null && [ -s "$out" ]; then
+    return 0
+  fi
+  curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/${repo}/main/${path}?nocache=$(date +%s%N)" -o "$out" 2>/dev/null || true
+}
+
 echo -e "\033[1;34m==>\033[0m Downloading latest scripts & menu..."
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/menu.py?nocache=$(date +%s%N)" -o /opt/hysteria/menu.py 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/online-check.sh?nocache=$(date +%s%N)" -o /usr/local/bin/online-check.sh 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/sysinfo.sh?nocache=$(date +%s%N)" -o /usr/local/bin/sysinfo.sh 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/scripts/vnstat-traffic.sh?nocache=$(date +%s%N)" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/web/index.html?nocache=$(date +%s%N)" -o /home/vps/public_html/server/index.html 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/auto-update.sh?nocache=$(date +%s%N)" -o /opt/hysteria/auto-update.sh 2>/dev/null
-curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "${BASE}/version.txt?nocache=$(date +%s%N)" -o /opt/hysteria/version 2>/dev/null
+fetch_raw "scripts/menu.py" "/opt/hysteria/menu.py"
+fetch_raw "scripts/online-check.sh" "/usr/local/bin/online-check.sh"
+fetch_raw "scripts/sysinfo.sh" "/usr/local/bin/sysinfo.sh"
+fetch_raw "scripts/vnstat-traffic.sh" "/usr/local/bin/vnstat-traffic.sh"
+fetch_raw "web/index.html" "/home/vps/public_html/server/index.html"
+fetch_raw "auto-update.sh" "/opt/hysteria/auto-update.sh"
+fetch_raw "version.txt" "/opt/hysteria/version"
 
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null

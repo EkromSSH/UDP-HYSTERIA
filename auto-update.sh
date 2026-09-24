@@ -1,12 +1,23 @@
-#!/bin/bash
-BASE="https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main"
-curl -sL "$BASE/scripts/menu.py" -o /opt/hysteria/menu.py 2>/dev/null
-curl -sL "$BASE/scripts/online-check.sh" -o /usr/local/bin/online-check.sh 2>/dev/null
-curl -sL "$BASE/scripts/sysinfo.sh" -o /usr/local/bin/sysinfo.sh 2>/dev/null
-curl -sL "$BASE/scripts/vnstat-traffic.sh" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-curl -sL "$BASE/web/index.html" -o /home/vps/public_html/server/index.html 2>/dev/null
-curl -sL "$BASE/install.sh" -o /tmp/ida-update.sh 2>/dev/null
-chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /tmp/ida-update.sh 2>/dev/null
+fetch_raw() {
+  local repo="EkromSSH/UDP-HYSTERIA"
+  local path="$1"
+  local out="$2"
+  if curl -sL -H "Accept: application/vnd.github.v3.raw" "https://api.github.com/repos/${repo}/contents/${path}" -o "$out" 2>/dev/null && [ -s "$out" ]; then
+    return 0
+  fi
+  curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/${repo}/main/${path}?nocache=$(date +%s%N)" -o "$out" 2>/dev/null || true
+}
+
+fetch_raw "scripts/menu.py" "/opt/hysteria/menu.py"
+fetch_raw "scripts/online-check.sh" "/usr/local/bin/online-check.sh"
+fetch_raw "scripts/sysinfo.sh" "/usr/local/bin/sysinfo.sh"
+fetch_raw "scripts/vnstat-traffic.sh" "/usr/local/bin/vnstat-traffic.sh"
+fetch_raw "web/index.html" "/home/vps/public_html/server/index.html"
+fetch_raw "auto-update.sh" "/opt/hysteria/auto-update.sh"
+fetch_raw "version.txt" "/opt/hysteria/version"
+fetch_raw "install.sh" "/tmp/ida-update.sh"
+
+chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh /tmp/ida-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
 # Update config: ensure disable_mtu_discovery=true for gaming/UDP stability, low-RAM mobile buffer & resolve_preference=4
