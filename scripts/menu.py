@@ -349,7 +349,8 @@ def show_info():
             up = _d.get("up_mbps", 100)
             down = _d.get("down_mbps", 100)
     except: pass
-    link = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria#Hysteria-UDP"
+    link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria#Hysteria-Direct"
+    link_hop = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=10000-65000#Hysteria-PortHop"
     
     os.system("clear"); print()
     box_header("CONNECTION INFO", "Hysteria v1 Client Details")
@@ -367,16 +368,18 @@ def show_info():
     box_section("GAMING OPTIMIZATION")
     bput("")
     box_kv("MTU Discovery", f"{G}[ OK ] Disabled (Fixed 1280){NC}", 16)
-    box_kv("UDP Buffer", f"{G}[ OK ] 8 MB (Sysctl Buffer){NC}", 16)
+    box_kv("UDP Buffer", f"{G}[ OK ] 16 MB (Sysctl Buffer){NC}", 16)
     box_kv("BadVPN Ports", f"{G}[ OK ] 7100, 7200, 7300 Active{NC}", 16)
     bput("")
     box_section("CLIENT CONNECTIVITY")
     bput("")
-    box_kv("Supported Apps", "Creeb, V2Box, Matsuri, NekoBox", 16)
-    box_kv("Client URL", "(See 1-click copy link below)", 16, C)
+    box_kv("Supported Apps", "IDA VPN, V2Box, Matsuri, NekoBox, Sing-box", 16)
+    box_kv("Direct Port URL", "(Fastest for True / AIS / Dtac)", 16, C)
+    box_kv("Port Hopping URL", "(Bypasses ISP UDP block/throttling)", 16, C)
     bput("")
     box_footer()
-    print(f"  {Y}>>{NC} {BD}Copy URL:{NC} {C}{link}{NC}\n")
+    print(f"  {Y}>>{NC} {BD}Direct URL:{NC}     {C}{link_direct}{NC}")
+    print(f"  {Y}>>{NC} {BD}PortHop URL:{NC}    {C}{link_hop}{NC}\n")
     press_enter()
 
 # 02. Restart Hysteria
