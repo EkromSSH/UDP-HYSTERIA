@@ -794,7 +794,10 @@ def edit_auth():
     try:
         with open(HYST_CONFIG) as f: d = json.load(f)
         d["auth_str"] = n
-        d["auth"] = {"mode": "passwords", "config": [n]}
+        auth_list = [n]
+        if ":" not in n:
+            auth_list.append(f"{n}:{n}")
+        d["auth"] = {"mode": "passwords", "config": auth_list}
         with open(HYST_CONFIG, 'w') as f: json.dump(d, f, indent=2)
         subprocess.run(["systemctl", "restart", "hysteria"], capture_output=True, text=True, timeout=10)
         time.sleep(2)
@@ -936,6 +939,22 @@ def change_port():
         with open(HYST_CONFIG) as f: d = json.load(f)
         d["listen"] = f"{d.get('listen',':25000').rsplit(':',1)[0]}:{chosen_port}"
         with open(HYST_CONFIG, 'w') as f: json.dump(d, f, indent=2)
+
+        # Update iptables NAT PREROUTING and INPUT rules
+        subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port {p} 2>/dev/null", shell=True)
+        subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {p} -j REDIRECT --to-port {p} 2>/dev/null", shell=True)
+        subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port {chosen_port}", shell=True)
+        subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {chosen_port} -j REDIRECT --to-port {chosen_port}", shell=True)
+        subprocess.run(f"iptables -I INPUT -p udp --dport {chosen_port} -j ACCEPT 2>/dev/null", shell=True)
+        subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
+
+        # Update /etc/showon.conf
+        if os.path.exists(SHOWON_CONF):
+            with open(SHOWON_CONF, 'r') as sf: sfc = sf.read()
+            sfc = re.sub(r'^AGN_PORT=.*$', f'AGN_PORT="{chosen_port}"', sfc, flags=re.MULTILINE)
+            with open(SHOWON_CONF, 'w') as sf: sf.write(sfc)
+        subprocess.run("systemctl restart online-check 2>/dev/null", shell=True)
+
         subprocess.run(["systemctl", "restart", "hysteria"], capture_output=True, text=True, timeout=10)
         time.sleep(2)
         
@@ -948,6 +967,7 @@ def change_port():
         bput("")
         box_kv("Old Port", f"{p} (UDP)", 16, D)
         box_kv("New Port", f"{chosen_port} (UDP)", 16, G)
+        box_kv("Port Hopping", f"{G}[ OK ] 10000-65000 -> {chosen_port}{NC}", 16)
         box_kv("Service Status", f"{G}[ ONLINE ] Restarted{NC}", 16)
         bput("")
         box_footer()
@@ -1356,15 +1376,23 @@ def auto_fix_gaming():
     except: pass
 
     try:
+        need_badvpn_update = False
         r = subprocess.run("systemctl is-active badvpn3", shell=True, capture_output=True, text=True)
         if r.stdout.strip() != "active":
+            need_badvpn_update = True
+        elif os.path.exists("/etc/systemd/system/badvpn1.service"):
+            with open("/etc/systemd/system/badvpn1.service", "r") as bf:
+                if "client-socket-sndbuf 0" in bf.read():
+                    need_badvpn_update = True
+
+        if need_badvpn_update:
             subprocess.run("rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null", shell=True)
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
-            subprocess.run("systemctl daemon-reload && systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
+            subprocess.run("systemctl daemon-reload && systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass
 
     try:
@@ -1386,8 +1414,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10

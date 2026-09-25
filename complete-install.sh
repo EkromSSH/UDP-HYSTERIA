@@ -21,24 +21,31 @@ apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--fo
 echo -e "\n\033[1;34m==>\033[0m Downloading Hysteria v1.3.5..."
 wget -q https://github.com/apernet/hysteria/releases/download/v1.3.5/hysteria-linux-amd64 -O /usr/local/bin/hysteria
 chmod +x /usr/local/bin/hysteria
-mkdir -p /opt/hysteria/certs /home/vps/public_html/server
+mkdir -p /etc/hysteria /home/vps/public_html/server
 
 echo -e "\n\033[1;34m==>\033[0m Generating certificates..."
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /opt/hysteria/certs/server.key -out /opt/hysteria/certs/server.crt \
+  -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt \
   -subj "/C=TH/ST=Bangkok/L=Bangkok/O=IDA VPN/CN=${SERVER_IP}" 2>/dev/null
-chmod 600 /opt/hysteria/certs/server.key
+chmod 600 /etc/hysteria/server.key
 
 cat > /opt/hysteria/config-v1.json << EOF
 {
   "listen": ":${PORT}",
   "protocol": "udp",
-  "cert": "/opt/hysteria/certs/server.crt",
-  "key": "/opt/hysteria/certs/server.key",
+  "cert": "/etc/hysteria/server.crt",
+  "key": "/etc/hysteria/server.key",
   "up_mbps": 100,
   "down_mbps": 100,
   "obfs": "${OBFS}",
   "auth_str": "${AUTH}",
+  "auth": {
+    "mode": "passwords",
+    "config": [
+      "${AUTH}",
+      "${AUTH}:${AUTH}"
+    ]
+  },
   "recv_window_conn": 2097152,
   "recv_window_client": 8388608,
   "max_conn_client": 1024,
@@ -57,11 +64,13 @@ cat > /etc/systemd/system/hysteria.service << 'EOF'
 [Unit]
 Description=Hysteria VPN Server
 After=network.target
-[Service] Type=simple
+[Service]
+Type=simple
 ExecStart=/bin/bash /opt/hysteria/start.sh
 Restart=always
 RestartSec=3
-[Install] WantedBy=multi-user.target
+[Install]
+WantedBy=multi-user.target
 EOF
 
 # ══ Kernel & UDP Buffer Optimization ══
@@ -85,8 +94,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -118,7 +127,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000

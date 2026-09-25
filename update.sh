@@ -44,8 +44,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -84,7 +84,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000

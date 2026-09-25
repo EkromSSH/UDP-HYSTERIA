@@ -67,7 +67,7 @@ restore_sources
 
 # ══ Download Hysteria ══
 echo -e "\n\033[1;34m==>\033[0m Downloading Hysteria v1.3.5..."
-wget -q https://github.com/apernet/hysteria/releases/download/v1.3.5/hysteria-linux-amd64 -O /usr/local/bin/hysteria
+timeout 60 wget -q --timeout=50 https://github.com/apernet/hysteria/releases/download/v1.3.5/hysteria-linux-amd64 -O /usr/local/bin/hysteria
 chmod +x /usr/local/bin/hysteria
 mkdir -p /opt/hysteria /etc/hysteria /home/vps/public_html/server
 chmod o+x /home/vps 2>/dev/null
@@ -88,6 +88,13 @@ cat > /opt/hysteria/config-v1.json << EOF
   "down_mbps": 100,
   "obfs": "${OBFS}",
   "auth_str": "${AUTH}",
+  "auth": {
+    "mode": "passwords",
+    "config": [
+      "${AUTH}",
+      "${AUTH}:${AUTH}"
+    ]
+  },
   "recv_window_conn": 2097152,
   "recv_window_client": 8388608,
   "max_conn_client": 1024,
@@ -136,8 +143,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -169,7 +176,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -373,11 +380,11 @@ fi
 
 # ══ Fresh update: download latest scripts from GitHub ══
 echo -e "\n\033[1;34m==>\033[0m Updating to latest scripts..."
-curl -sL https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/web/index.html -o /home/vps/public_html/server/index.html 2>/dev/null
-curl -sL https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/online-check.sh -o /usr/local/bin/online-check.sh 2>/dev/null
-curl -sL https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/sysinfo.sh -o /usr/local/bin/sysinfo.sh 2>/dev/null
-curl -sL https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/vnstat-traffic.sh -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-curl -sL https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/menu.py -o /opt/hysteria/menu.py 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/web/index.html -o /home/vps/public_html/server/index.html 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/online-check.sh -o /usr/local/bin/online-check.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/sysinfo.sh -o /usr/local/bin/sysinfo.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/vnstat-traffic.sh -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
+timeout 30 curl -sL --max-time 25 https://raw.githubusercontent.com/EkromSSH/hysteria-install/main/scripts/menu.py -o /opt/hysteria/menu.py 2>/dev/null
 chmod +x /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/menu.py 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
@@ -463,7 +470,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 512 --client-socket-sndbuf 0
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -473,8 +480,6 @@ LimitNOFILE=1000000
 WantedBy=multi-user.target
 EOF
 done
-systemctl daemon-reload
-systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 
