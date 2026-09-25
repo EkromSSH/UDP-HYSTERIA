@@ -1,11 +1,29 @@
 fetch_raw() {
-  local repo="EkromSSH/UDP-HYSTERIA"
   local path="$1"
   local out="$2"
-  if curl -sL -H "Accept: application/vnd.github.v3.raw" "https://api.github.com/repos/${repo}/contents/${path}" -o "$out" 2>/dev/null && [ -s "$out" ]; then
-    return 0
-  fi
-  curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/${repo}/main/${path}?nocache=$(date +%s%N)" -o "$out" 2>/dev/null || true
+  local tmp
+  tmp=$(mktemp)
+
+  for repo in "EkromSSH/UDP-HYSTERIA" "EkromSSH/hysteria-install"; do
+    if curl -fsSL -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" \
+         "https://raw.githubusercontent.com/${repo}/main/${path}?v=$(date +%s%N)${RANDOM}" \
+         -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+      
+      # If python script, ensure valid syntax before deploying
+      if [[ "$path" == *.py ]]; then
+        if ! python3 -m py_compile "$tmp" >/dev/null 2>&1; then
+          continue
+        fi
+      fi
+      
+      mkdir -p "$(dirname "$out")"
+      mv -f "$tmp" "$out"
+      return 0
+    fi
+  done
+  
+  rm -f "$tmp"
+  return 1
 }
 
 fetch_raw "scripts/menu.py" "/opt/hysteria/menu.py"

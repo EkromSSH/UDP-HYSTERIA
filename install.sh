@@ -392,14 +392,44 @@ systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
 # ══ Auto-update menu (every 6 hours) ══
 cat > /opt/hysteria/auto-update.sh << 'AU'
 #!/bin/bash
-BASE="https://raw.githubusercontent.com/EkromSSH/hysteria-install/main"
-curl -sL "$BASE/scripts/menu.py" -o /opt/hysteria/menu.py 2>/dev/null
-curl -sL "$BASE/scripts/online-check.sh" -o /usr/local/bin/online-check.sh 2>/dev/null
-curl -sL "$BASE/scripts/sysinfo.sh" -o /usr/local/bin/sysinfo.sh 2>/dev/null
-curl -sL "$BASE/scripts/vnstat-traffic.sh" -o /usr/local/bin/vnstat-traffic.sh 2>/dev/null
-curl -sL "$BASE/web/index.html" -o /home/vps/public_html/server/index.html 2>/dev/null
-curl -sL "$BASE/install.sh" -o /tmp/ida-update.sh 2>/dev/null
-chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /tmp/ida-update.sh 2>/dev/null
+fetch_raw() {
+  local path="$1"
+  local out="$2"
+  local tmp
+  tmp=$(mktemp)
+
+  for repo in "EkromSSH/UDP-HYSTERIA" "EkromSSH/hysteria-install"; do
+    if curl -fsSL -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" \
+         "https://raw.githubusercontent.com/${repo}/main/${path}?v=$(date +%s%N)${RANDOM}" \
+         -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+      
+      if [[ "$path" == *.py ]]; then
+        if ! python3 -m py_compile "$tmp" >/dev/null 2>&1; then
+          continue
+        fi
+      fi
+      
+      mkdir -p "$(dirname "$out")"
+      mv -f "$tmp" "$out"
+      return 0
+    fi
+  done
+  
+  rm -f "$tmp"
+  return 1
+}
+
+fetch_raw "scripts/menu.py" "/opt/hysteria/menu.py"
+fetch_raw "scripts/online-check.sh" "/usr/local/bin/online-check.sh"
+fetch_raw "scripts/sysinfo.sh" "/usr/local/bin/sysinfo.sh"
+fetch_raw "scripts/vnstat-traffic.sh" "/usr/local/bin/vnstat-traffic.sh"
+fetch_raw "web/index.html" "/home/vps/public_html/server/index.html"
+fetch_raw "auto-update.sh" "/opt/hysteria/auto-update.sh"
+fetch_raw "version.txt" "/opt/hysteria/version"
+fetch_raw "install.sh" "/tmp/ida-update.sh"
+
+chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh /tmp/ida-update.sh 2>/dev/null
+chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 # Update config: ensure disable_mtu_discovery=true for gaming/UDP stability, low-RAM mobile buffer & resolve_preference=4
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
@@ -436,8 +466,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10

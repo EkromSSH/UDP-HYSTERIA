@@ -1464,7 +1464,7 @@ def update_dashboard():
     box_footer()
     
     try:
-        subprocess.run("curl -sL 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?t='$(date +%s) | bash", shell=True)
+        subprocess.run("curl -fsSL -H 'Cache-Control: no-cache, no-store, must-revalidate' -H 'Pragma: no-cache' 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?v='$(date +%s%N)$RANDOM | bash", shell=True)
     except Exception as e:
         print(f"  {R}Update Error: {e}{NC}")
         

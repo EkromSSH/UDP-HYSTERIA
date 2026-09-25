@@ -99,15 +99,33 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 echo -e "  \033[1;32m✅ BadVPN udpgw 7100, 7200, 7300 active\033[0m"
 
-# 4. Download latest scripts from GitHub (API-first to bypass CDN cache)
+# 4. Download latest scripts from GitHub (Safe atomic download + syntax validation)
 fetch_raw() {
-  local repo="EkromSSH/UDP-HYSTERIA"
   local path="$1"
   local out="$2"
-  if curl -sL -H "Accept: application/vnd.github.v3.raw" "https://api.github.com/repos/${repo}/contents/${path}" -o "$out" 2>/dev/null && [ -s "$out" ]; then
-    return 0
-  fi
-  curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://raw.githubusercontent.com/${repo}/main/${path}?nocache=$(date +%s%N)" -o "$out" 2>/dev/null || true
+  local tmp
+  tmp=$(mktemp)
+
+  for repo in "EkromSSH/UDP-HYSTERIA" "EkromSSH/hysteria-install"; do
+    if curl -fsSL -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" \
+         "https://raw.githubusercontent.com/${repo}/main/${path}?v=$(date +%s%N)${RANDOM}" \
+         -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+      
+      # If python script, ensure valid syntax before deploying
+      if [[ "$path" == *.py ]]; then
+        if ! python3 -m py_compile "$tmp" >/dev/null 2>&1; then
+          continue
+        fi
+      fi
+      
+      mkdir -p "$(dirname "$out")"
+      mv -f "$tmp" "$out"
+      return 0
+    fi
+  done
+  
+  rm -f "$tmp"
+  return 1
 }
 
 echo -e "\033[1;34m==>\033[0m Downloading latest scripts & menu..."
@@ -168,6 +186,9 @@ echo -e "\033[1;32m  🎉 Update Completed Successfully! (${VERSION})\033[0m"
 echo -e "\033[1;36m═══════════════════════════════════════\033[0m"
 echo "$VERSION" > /etc/ida-version 2>/dev/null || true
 echo "$VERSION" > /opt/hysteria/version 2>/dev/null || true
+if [ -f /etc/showon.conf ]; then
+  sed -i "s/^VERSION=.*/VERSION=\"${VERSION}\"/" /etc/showon.conf 2>/dev/null || true
+fi
 echo "  Version  : ${VERSION} (Gaming Fix Applied)"
 echo "  Hysteria : $(systemctl is-active hysteria)"
 echo "  BadVPN 1 : $(systemctl is-active badvpn1) (port 7100)"
