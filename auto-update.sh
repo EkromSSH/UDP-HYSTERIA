@@ -103,7 +103,7 @@ EOF
 done
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
-echo "v2.3.2" > /etc/ida-version 2>/dev/null || true
+echo "v2.3.3" > /etc/ida-version 2>/dev/null || true
 
 # Ensure sysinfo & vnstat-traffic service definitions with [Install] section
 if [ ! -f /etc/systemd/system/sysinfo.service ] || ! grep -q "\[Install\]" /etc/systemd/system/sysinfo.service 2>/dev/null; then

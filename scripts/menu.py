@@ -19,7 +19,7 @@ def get_version():
                     v = f.read().strip()
                     if v: return v
             except: pass
-    return "v2.3.2"
+    return "v2.3.3"
 
 VERSION = get_version()
 

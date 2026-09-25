@@ -211,10 +211,10 @@ sleep 3
 systemctl is-active hysteria && echo "✅ Hysteria: active" || echo "❌ Hysteria: failed"
 
 # ══ showon.conf ══
-echo "v2.3.2" > /etc/ida-version 2>/dev/null || true
-echo "v2.3.2" > /opt/hysteria/version 2>/dev/null || true
+echo "v2.3.3" > /etc/ida-version 2>/dev/null || true
+echo "v2.3.3" > /opt/hysteria/version 2>/dev/null || true
 cat > /etc/showon.conf << E3
-VERSION="V.2.3.2"
+VERSION="V.2.3.3"
 WWW_DIR="/home/vps/public_html/server"
 LIMIT=50
 NET_IFACE="eth0"

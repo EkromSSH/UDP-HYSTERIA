@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════
 # IDA UDPHysteria — Quick Update & Game Fix
 # ═══════════════════════════════════════════════════════
-VERSION="v2.3.2"
+VERSION="v2.3.3"
 echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
 
 # 1. Update MTU, Mobile Buffer & IPv4 Resolve for gaming and mobile connectivity
