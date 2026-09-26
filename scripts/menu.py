@@ -358,8 +358,8 @@ def show_info():
             up = _d.get("up_mbps", 100)
             down = _d.get("down_mbps", 100)
     except: pass
-    link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria#Hysteria-Direct"
-    link_hop = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=10000-65000#Hysteria-PortHop"
+    link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-Direct"
+    link_hop = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=10000-65000&retry=3#Hysteria-PortHop"
     
     os.system("clear"); print()
     box_header("CONNECTION INFO", "Hysteria v1 Client Details")
@@ -374,10 +374,11 @@ def show_info():
     box_kv("OBFS Key", o if o else "(disabled)", 16, WHT)
     box_kv("Status", f"{st_color}[ {st_text} ]{NC}  Up: {get_uptime()}", 16)
     bput("")
-    box_section("GAMING OPTIMIZATION")
+    box_section("4G+/5G MOBILE & GAMING")
     bput("")
-    box_kv("MTU Discovery", f"{G}[ OK ] Disabled (Fixed 1280){NC}", 16)
-    box_kv("UDP Buffer", f"{G}[ OK ] 16 MB (Sysctl Buffer){NC}", 16)
+    box_kv("MTU & MSS Clamping", f"{G}[ OK ] MTU 1280 & MSS 1280{NC}", 16)
+    box_kv("DNS Resolver", f"{G}[ OK ] Direct IPv4 (udp://8.8.8.8:53){NC}", 16)
+    box_kv("UDP Kernel Buffer", f"{G}[ OK ] 64 MB (Sysctl Buffer){NC}", 16)
     box_kv("BadVPN Ports", f"{G}[ OK ] 7100, 7200, 7300 Active{NC}", 16)
     bput("")
     box_section("CLIENT CONNECTIVITY")
@@ -1376,6 +1377,9 @@ def auto_fix_gaming():
                 if '"resolve_preference"' not in content:
                     content = content.rstrip().rstrip('}') + ',\n  "resolve_preference": "4"\n}'
                     changed = True
+                if '"resolver"' not in content:
+                    content = content.rstrip().rstrip('}') + ',\n  "resolver": "udp://8.8.8.8:53"\n}'
+                    changed = True
                 if '20971520' in content:
                     content = content.replace('20971520', '2097152')
                     changed = True
@@ -1409,10 +1413,12 @@ def auto_fix_gaming():
 
     try:
         cfg = """# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.rmem_default = 4194304
-net.core.wmem_default = 4194304
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
 net.ipv4.ip_local_port_range = 10000 65535
@@ -1424,10 +1430,10 @@ net.ipv4.ip_forward = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+# Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
 net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -1435,7 +1441,7 @@ net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
 
-# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts on 5G)
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -1444,6 +1450,15 @@ net.ipv6.conf.lo.disable_ipv6 = 1
         subprocess.run("sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1", shell=True)
         with open("/etc/modprobe.d/nf_conntrack.conf", "w") as f: f.write("options nf_conntrack hashsize=262144\n")
         subprocess.run("echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true", shell=True)
+
+        # Apply TCP MSS Clamping to prevent packet fragmentation on mobile 4G+/5G networks
+        subprocess.run("iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
+        subprocess.run("iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
+        subprocess.run("iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
+        subprocess.run("iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
+        subprocess.run("iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
+        subprocess.run("iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
+        subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
     except: pass
 
 def update_dashboard():

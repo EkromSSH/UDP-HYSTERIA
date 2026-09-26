@@ -38,13 +38,13 @@ fetch_raw "install.sh" "/tmp/ida-update.sh"
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh /tmp/ida-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
-# Update config: ensure disable_mtu_discovery=true for gaming/UDP stability, low-RAM mobile buffer & resolve_preference=4
+# Update config: ensure disable_mtu_discovery=true for 4G+/5G stability, IPv4-only resolver & low-RAM buffer
 _hyst_changed=0
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
     if grep -q '"disable_mtu_discovery"[[:space:]]*:[[:space:]]*false' "$cfg" 2>/dev/null || \
        ! grep -q 'disable_mtu_discovery' "$cfg" 2>/dev/null; then
-      sed -i -E -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
+      sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
       if ! grep -q 'disable_mtu_discovery' "$cfg" 2>/dev/null; then
         sed -i -E 's/}$/,\n  "disable_mtu_discovery": true\n}/' "$cfg" 2>/dev/null || true
       fi
@@ -53,6 +53,19 @@ for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/
     if ! grep -q 'resolve_preference' "$cfg" 2>/dev/null; then
       sed -i -E 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
       _hyst_changed=1
+    fi
+    if ! grep -q 'resolver' "$cfg" 2>/dev/null; then
+      sed -i -E 's/}$/,\n  "resolver": "udp:\/\/8.8.8.8:53"\n}/' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
+    fi
+    if grep -q '20971520' "$cfg" 2>/dev/null; then
+      sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
+    fi
+    if grep -q '41943040' "$cfg" 2>/dev/null; then
+      sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
+    fi
   fi
 done
 if [ "$_hyst_changed" -eq 1 ]; then
@@ -62,10 +75,12 @@ fi
 # Apply sysctl UDP buffer, conntrack, BBR & ephemeral port optimization
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.rmem_default = 4194304
-net.core.wmem_default = 4194304
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
 net.ipv4.ip_local_port_range = 10000 65535
@@ -77,10 +92,10 @@ net.ipv4.ip_forward = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+# Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
 net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -88,7 +103,7 @@ net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
 
-# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts on 5G)
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -127,9 +142,13 @@ done
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 
-# Apply TCP MSS Clamping to prevent packet fragmentation on mobile networks
-iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+# Apply TCP MSS Clamping (1280) to prevent packet fragmentation & drops on 4G+/5G networks
+iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 
 [ -f /opt/hysteria/version ] && cp -f /opt/hysteria/version /etc/ida-version 2>/dev/null || true
@@ -173,4 +192,3 @@ fi
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now sysinfo vnstat-traffic 2>/dev/null || true
 systemctl restart online-check sysinfo vnstat-traffic 2>/dev/null || true
-

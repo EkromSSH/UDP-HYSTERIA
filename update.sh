@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════
-# IDA UDPHysteria — Quick Update & Game Fix
+# IDA UDPHysteria — Quick Update & 4G+/5G Network/Game Fix
 # ═══════════════════════════════════════════════════════
 TARGET_VERSION="${1:-$NEXT_VERSION}"
 if [ -z "$TARGET_VERSION" ]; then
@@ -24,10 +24,10 @@ if [ -z "$TARGET_VERSION" ]; then
   fi
 fi
 VERSION="$TARGET_VERSION"
-echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
+echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying 4G+/5G Mobile & Gaming Fixes...\033[0m\n"
 
-# 1. Update MTU, Mobile Buffer & IPv4 Resolve for gaming and mobile connectivity
-echo -e "\033[1;34m==>\033[0m Fixing MTU, Low-RAM Buffer & Resolve Preference for Mobile & Gaming..."
+# 1. Update MTU, Mobile Buffer, Direct IPv4 DNS & Resolve Preference for 4G+/5G & Gaming
+echo -e "\033[1;34m==>\033[0m Fixing MTU (1280), Direct IPv4 Resolver & Low-RAM Buffer for Mobile 4G+/5G..."
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
     sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
@@ -37,21 +37,26 @@ for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/
     if ! grep -q "resolve_preference" "$cfg" 2>/dev/null; then
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
     fi
+    if ! grep -q "resolver" "$cfg" 2>/dev/null; then
+      sed -i -E 's/}$/,\n  "resolver": "udp:\/\/8.8.8.8:53"\n}/' "$cfg" 2>/dev/null || true
+    fi
     sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
     sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
   fi
 done
 systemctl restart hysteria 2>/dev/null || true
-echo -e "  \033[1;32m✅ MTU (1280), Mobile Buffer (2M/8M) & resolve_preference (4) applied\033[0m"
+echo -e "  \033[1;32m✅ MTU (1280), Mobile Buffer (2M/8M), Resolver (8.8.8.8) & resolve_preference (4) applied\033[0m"
 
 # 2. Kernel & UDP Buffer & Conntrack Optimization
-echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer, Conntrack, BBR & IPv6 optimizations..."
+echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer (64MB), Conntrack, BBR & IPv6 optimizations..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.rmem_default = 4194304
-net.core.wmem_default = 4194304
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
 net.ipv4.ip_local_port_range = 10000 65535
@@ -63,10 +68,10 @@ net.ipv4.ip_forward = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+# Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
 net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -74,7 +79,7 @@ net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
 
-# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts on 5G)
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -83,7 +88,7 @@ sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
 
 echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
 echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
-echo -e "  \033[1;32m✅ Sysctl UDP Buffer 16MB, BBR+FQ, Conntrack 1M & IPv6 disabled applied\033[0m"
+echo -e "  \033[1;32m✅ Sysctl UDP Buffer 64MB, BBR+FQ, Conntrack 1M & IPv6 disabled applied\033[0m"
 
 # 3. Install & Start BadVPN udpgw (7100, 7200, 7300) for games (Roblox Error 279, etc.)
 echo -e "\033[1;34m==>\033[0m Checking & Installing BadVPN-udpgw (7100, 7200, 7300)..."
@@ -120,7 +125,16 @@ systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 echo -e "  \033[1;32m✅ BadVPN udpgw 7100, 7200, 7300 active\033[0m"
 
-# 4. Download latest scripts from GitHub (Safe atomic download + syntax validation)
+# 4. Apply TCP MSS Clamping to prevent packet fragmentation on mobile 4G+/5G networks
+iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+
+# 5. Download latest scripts from GitHub (Safe atomic download + syntax validation)
 fetch_raw() {
   local path="$1"
   local out="$2"
@@ -161,7 +175,7 @@ fetch_raw "version.txt" "/opt/hysteria/version"
 chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sysinfo.sh /usr/local/bin/vnstat-traffic.sh /opt/hysteria/auto-update.sh 2>/dev/null
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
-# 5. Ensure systemd services & restart
+# 6. Ensure systemd services & restart
 if [ ! -f /etc/systemd/system/sysinfo.service ] || ! grep -q "\[Install\]" /etc/systemd/system/sysinfo.service 2>/dev/null; then
   cat > /etc/systemd/system/sysinfo.service << 'EOF'
 [Unit]
@@ -210,10 +224,11 @@ echo "$VERSION" > /opt/hysteria/version 2>/dev/null || true
 if [ -f /etc/showon.conf ]; then
   sed -i "s/^VERSION=.*/VERSION=\"${VERSION}\"/" /etc/showon.conf 2>/dev/null || true
 fi
-echo "  Version  : ${VERSION} (Gaming Fix Applied)"
+echo "  Version  : ${VERSION} (4G+/5G Mobile & Gaming Fix Applied)"
 echo "  Hysteria : $(systemctl is-active hysteria)"
 echo "  BadVPN 1 : $(systemctl is-active badvpn1) (port 7100)"
 echo "  BadVPN 2 : $(systemctl is-active badvpn2) (port 7200)"
 echo "  BadVPN 3 : $(systemctl is-active badvpn3) (port 7300)"
-echo "  MTU Fix  : disable_mtu_discovery=true"
+echo "  MTU Fix  : disable_mtu_discovery=true & MSS 1280"
+echo "  DNS Fix  : Direct IPv4 Resolver (udp://8.8.8.8:53)"
 echo ""

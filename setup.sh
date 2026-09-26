@@ -39,11 +39,12 @@ cat > /opt/hysteria/config-v1.json << EOF
       "${AUTH}:${AUTH}"
     ]
   },
+  "resolver": "udp://8.8.8.8:53",
+  "resolve_preference": "4",
+  "disable_mtu_discovery": true,
   "recv_window_conn": 2097152,
   "recv_window_client": 8388608,
-  "max_conn_client": 1024,
-  "resolve_preference": "4",
-  "disable_mtu_discovery": true
+  "max_conn_client": 1024
 }
 EOF
 cat > /opt/hysteria/start.sh << 'E1'
@@ -65,13 +66,15 @@ WantedBy=multi-user.target
 E2
 
 # ══ Kernel & UDP Buffer Optimization ══
-echo -e "\n\033[1;34m==>\033[0m Optimizing system UDP buffers & network..."
+echo -e "\n\033[1;34m==>\033[0m Optimizing system UDP buffers & network for 4G+/5G..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.rmem_default = 4194304
-net.core.wmem_default = 4194304
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 8388608
+net.core.wmem_default = 8388608
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
 net.ipv4.ip_local_port_range = 10000 65535
@@ -83,10 +86,10 @@ net.ipv4.ip_forward = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+# Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
 net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -94,7 +97,7 @@ net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
 
-# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts on 5G)
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
@@ -131,13 +134,22 @@ EOF
   systemctl enable --now badvpn${idx} 2>/dev/null || true
 done
 
-echo -e "\n\033[1;34m==>\033[0m Setting up port hopping (UDP 10000-65000 -> ${PORT})..."
+# ══ Port hopping & TCP MSS 1280 Clamping ══
+echo -e "\n\033[1;34m==>\033[0m Setting up port hopping & TCP MSS Clamping (1280)..."
 iptables -t nat -D PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port ${PORT} 2>/dev/null || true
 iptables -t nat -D PREROUTING -p udp --dport ${PORT} -j REDIRECT --to-port ${PORT} 2>/dev/null || true
 iptables -t nat -A PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port ${PORT}
 iptables -t nat -A PREROUTING -p udp --dport ${PORT} -j REDIRECT --to-port ${PORT}
 iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT 2>/dev/null || true
 iptables -I INPUT -p udp --dport 10000:65000 -j ACCEPT 2>/dev/null || true
+
+# TCP MSS Clamping to 1280 to prevent MTU GTP tunnel drop on 4G+/5G
+iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 systemctl daemon-reload && systemctl enable hysteria && systemctl restart hysteria
 sleep 3
