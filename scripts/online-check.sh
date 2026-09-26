@@ -55,7 +55,7 @@ if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null || true
   for bp in 7100 7200 7300; do
     bidx=$(( (bp - 7000) / 100 ))
-    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || ! grep -q "client-socket-sndbuf 524288" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
+    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || ! grep -q "client-socket-sndbuf 0" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
       cat > "/etc/systemd/system/badvpn${bidx}.service" << BV
 [Unit]
 Description=UDP ${bp}
@@ -79,7 +79,7 @@ BV
   systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 fi
 
-if [ ! -f /etc/sysctl.d/99-hysteria.conf ] || ! grep -q "10000 65535" /etc/sysctl.d/99-hysteria.conf 2>/dev/null; then
+if [ ! -f /etc/sysctl.d/99-hysteria.conf ] || ! grep -q "rmem_max = 16777216" /etc/sysctl.d/99-hysteria.conf 2>/dev/null; then
   cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
 net.core.rmem_max = 16777216
@@ -88,7 +88,7 @@ net.core.rmem_default = 4194304
 net.core.wmem_default = 4194304
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 1024 9999
+net.ipv4.ip_local_port_range = 10000 65535
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -99,8 +99,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 20
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 60
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
