@@ -1393,7 +1393,7 @@ def auto_fix_gaming():
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 524288 --udp-mtu 1400\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass
@@ -1406,7 +1406,7 @@ net.core.rmem_default = 4194304
 net.core.wmem_default = 4194304
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 10000 65535
+net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -1417,8 +1417,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & VPN
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 20
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
