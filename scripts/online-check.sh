@@ -117,7 +117,7 @@ EOF
   echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
   echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
 fi
-echo "v2.3.4" > /etc/ida-version 2>/dev/null || true
+[ -f /opt/hysteria/version ] && cp -f /opt/hysteria/version /etc/ida-version 2>/dev/null || true
 
 # -------- Default config --------
 CONF="/etc/showon.conf"

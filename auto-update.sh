@@ -132,7 +132,7 @@ iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-m
 iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 
-echo "v2.3.4" > /etc/ida-version 2>/dev/null || true
+[ -f /opt/hysteria/version ] && cp -f /opt/hysteria/version /etc/ida-version 2>/dev/null || true
 
 # Ensure sysinfo & vnstat-traffic service definitions with [Install] section
 if [ ! -f /etc/systemd/system/sysinfo.service ] || ! grep -q "\[Install\]" /etc/systemd/system/sysinfo.service 2>/dev/null; then
