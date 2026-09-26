@@ -1385,7 +1385,7 @@ def auto_fix_gaming():
             need_badvpn_update = True
         elif os.path.exists("/etc/systemd/system/badvpn1.service"):
             with open("/etc/systemd/system/badvpn1.service", "r") as bf:
-                if "client-socket-sndbuf 0" not in bf.read():
+                if "client-socket-sndbuf 524288" not in bf.read():
                     need_badvpn_update = True
 
         if need_badvpn_update:
@@ -1393,7 +1393,7 @@ def auto_fix_gaming():
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0 --udp-mtu 1400\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 524288 --udp-mtu 1400\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass
