@@ -351,15 +351,16 @@ def show_info():
     p, a, o = read_config(); ip = get_ip(); st = get_status()
     st_color = G if st == "active" else R
     st_text = "ONLINE" if st == "active" else "OFFLINE"
-    up, down = 100, 100
+    up, down = 50, 50
     try:
         with open(HYST_CONFIG) as f:
             _d = json.load(f)
-            up = _d.get("up_mbps", 100)
-            down = _d.get("down_mbps", 100)
+            up = _d.get("up_mbps", 50)
+            down = _d.get("down_mbps", 50)
     except: pass
+    link_443 = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-443-Mobile"
+    link_hop = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=443,80,8443,2053,2083,2087,2096,8880,10000-65000&retry=3#Hysteria-PortHop"
     link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-Direct"
-    link_hop = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=10000-65000&retry=3#Hysteria-PortHop"
     
     os.system("clear"); print()
     box_header("CONNECTION INFO", "Hysteria v1 Client Details")
@@ -369,27 +370,29 @@ def show_info():
     box_kv("Protocol", "UDP Hysteria v1", 16)
     box_kv("Server IP", ip, 16, G)
     box_kv("Listen Port", f"{p} (UDP)", 16, Y)
-    box_kv("Port Range", "10000 - 65000", 16)
+    box_kv("Mobile Ports", "443, 80, 8443, 2053-2096, 10000-65000", 16, G)
     box_kv("Auth Pass", a if a else "(none)", 16, WHT)
     box_kv("OBFS Key", o if o else "(disabled)", 16, WHT)
     box_kv("Status", f"{st_color}[ {st_text} ]{NC}  Up: {get_uptime()}", 16)
     bput("")
-    box_section("4G+/5G MOBILE & GAMING")
+    box_section("4G+/5G MOBILE & GAMING OPTIMIZATION")
     bput("")
-    box_kv("MTU & MSS Clamping", f"{G}[ OK ] MTU 1280 & MSS 1280{NC}", 16)
+    box_kv("Mobile 443 QUIC", f"{G}[ OK ] Port 443 Active (Bypasses 5G Block){NC}", 16)
+    box_kv("MTU & MSS Clamping", f"{G}[ OK ] MTU 1280 & MSS 1280 (Anti-Drop){NC}", 16)
     box_kv("DNS Resolver", f"{G}[ OK ] Direct IPv4 (udp://8.8.8.8:53){NC}", 16)
     box_kv("UDP Kernel Buffer", f"{G}[ OK ] 64 MB (Sysctl Buffer){NC}", 16)
     box_kv("BadVPN Ports", f"{G}[ OK ] 7100, 7200, 7300 Active{NC}", 16)
     bput("")
-    box_section("CLIENT CONNECTIVITY")
+    box_section("CLIENT CONNECTIVITY LINKS")
     bput("")
-    box_kv("Supported Apps", "IDA VPN, V2Box, Matsuri, NekoBox, Sing-box", 16)
-    box_kv("Direct Port URL", "(Fastest for True / AIS / Dtac)", 16, C)
-    box_kv("Port Hopping URL", "(Bypasses ISP UDP block/throttling)", 16, C)
+    box_kv("4G+/5G Mobile URL", "(Recommended for True / AIS / Dtac 5G)", 16, G)
+    box_kv("Port Hopping URL", "(Multi-port bypass against throttling)", 16, C)
+    box_kv("Direct Port URL", f"(Standard port {p})", 16, Y)
     bput("")
     box_footer()
-    print(f"  {Y}>>{NC} {BD}Direct URL:{NC}     {C}{link_direct}{NC}")
-    print(f"  {Y}>>{NC} {BD}PortHop URL:{NC}    {C}{link_hop}{NC}\n")
+    print(f"  {G}>>{NC} {BD}4G+/5G URL:{NC}    {G}{link_443}{NC}")
+    print(f"  {Y}>>{NC} {BD}PortHop URL:{NC}   {C}{link_hop}{NC}")
+    print(f"  {D}>>{NC} {BD}Direct URL:{NC}    {WHT}{link_direct}{NC}\n")
     press_enter()
 
 # 02. Restart Hysteria
@@ -953,12 +956,11 @@ def change_port():
         d["listen"] = f"{d.get('listen',':25000').rsplit(':',1)[0]}:{chosen_port}"
         with open(HYST_CONFIG, 'w') as f: json.dump(d, f, indent=2)
 
-        # Update iptables NAT PREROUTING and INPUT rules
-        subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port {p} 2>/dev/null", shell=True)
-        subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {p} -j REDIRECT --to-port {p} 2>/dev/null", shell=True)
-        subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port {chosen_port}", shell=True)
-        subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {chosen_port} -j REDIRECT --to-port {chosen_port}", shell=True)
-        subprocess.run(f"iptables -I INPUT -p udp --dport {chosen_port} -j ACCEPT 2>/dev/null", shell=True)
+        # Update iptables NAT PREROUTING and INPUT rules for all mobile ports
+        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(chosen_port)]:
+            subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port} 2>/dev/null", shell=True)
+            subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port}", shell=True)
+            subprocess.run(f"iptables -I INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null", shell=True)
         subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
 
         # Update /etc/showon.conf
@@ -1458,6 +1460,19 @@ net.ipv6.conf.lo.disable_ipv6 = 1
         subprocess.run("iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
         subprocess.run("iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
         subprocess.run("iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
+
+        # Redirect all mobile 4G+/5G UDP ports to Hysteria listen port
+        hp, _, _ = read_config()
+        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(hp)]:
+            subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp} 2>/dev/null", shell=True)
+            subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp}", shell=True)
+            subprocess.run(f"iptables -I INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null", shell=True)
+
+        # NAT Postrouting Masquerade
+        subprocess.run("iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE", shell=True)
+        subprocess.run("iptables -t nat -C POSTROUTING -s 10.0.0.0/8 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -j MASQUERADE", shell=True)
+        subprocess.run("iptables -t nat -C POSTROUTING -s 172.16.0.0/12 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -j MASQUERADE", shell=True)
+        subprocess.run("iptables -t nat -C POSTROUTING -s 192.168.0.0/16 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE", shell=True)
         subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
     except: pass
 

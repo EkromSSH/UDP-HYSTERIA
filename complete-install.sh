@@ -23,11 +23,44 @@ wget -q https://github.com/apernet/hysteria/releases/download/v1.3.5/hysteria-li
 chmod +x /usr/local/bin/hysteria
 mkdir -p /etc/hysteria /home/vps/public_html/server
 
-echo -e "\n\033[1;34m==>\033[0m Generating certificates..."
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt \
-  -subj "/C=TH/ST=Bangkok/L=Bangkok/O=IDA VPN/CN=${SERVER_IP}" 2>/dev/null
+# ══ Generate certificates (with SAN for 4G+/5G Mobile / Android / iOS / Go TLS) ══
+echo -e "\n\033[1;34m==>\033[0m Generating TLS certificates with SAN..."
+cat <<CERTEOF > /tmp/cert.cnf
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+
+[req_distinguished_name]
+C = TH
+ST = Bangkok
+L = Bangkok
+O = IDA VPN
+OU = Hysteria Mobile
+CN = ${SERVER_IP}
+
+[v3_req]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = ${SERVER_IP}
+IP.2 = 127.0.0.1
+DNS.1 = ${SERVER_IP}
+DNS.2 = localhost
+DNS.3 = bing.com
+DNS.4 = www.bing.com
+DNS.5 = apple.com
+DNS.6 = wechat.com
+CERTEOF
+
+openssl req -new -x509 -days 3650 -nodes -config /tmp/cert.cnf -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt 2>/dev/null
+chmod 644 /etc/hysteria/server.crt
 chmod 600 /etc/hysteria/server.key
+rm -f /tmp/cert.cnf
 
 cat > /opt/hysteria/config-v1.json << EOF
 {

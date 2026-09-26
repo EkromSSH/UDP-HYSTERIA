@@ -149,6 +149,62 @@ iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set
 iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
 iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
 iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+
+# Check and generate SAN certificate if needed (4G+/5G Mobile TLS validation)
+if [ ! -f /etc/hysteria/server.crt ] || ! openssl x509 -in /etc/hysteria/server.crt -text -noout 2>/dev/null | grep -q "Subject Alternative Name"; then
+  MY_IP=$(curl -s --connect-timeout 3 ifconfig.me 2>/dev/null || ip -o -4 route get 8.8.8.8 2>/dev/null | awk '{print $7}')
+  cat <<CERTEOF > /tmp/cert.cnf
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+
+[req_distinguished_name]
+C = TH
+ST = Bangkok
+L = Bangkok
+O = IDA VPN
+OU = Hysteria Mobile
+CN = ${MY_IP}
+
+[v3_req]
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = ${MY_IP}
+IP.2 = 127.0.0.1
+DNS.1 = ${MY_IP}
+DNS.2 = localhost
+DNS.3 = bing.com
+DNS.4 = www.bing.com
+DNS.5 = apple.com
+DNS.6 = wechat.com
+CERTEOF
+  openssl req -new -x509 -days 3650 -nodes -config /tmp/cert.cnf -keyout /etc/hysteria/server.key -out /etc/hysteria/server.crt 2>/dev/null
+  chmod 644 /etc/hysteria/server.crt
+  chmod 600 /etc/hysteria/server.key
+  rm -f /tmp/cert.cnf
+  systemctl restart hysteria 2>/dev/null || true
+fi
+
+# Redirect all mobile 4G+/5G UDP ports to Hysteria listen port
+HP=$(grep -oP '"listen":\s*":\K[0-9]+' /opt/hysteria/config-v1.json 2>/dev/null || echo 36712)
+for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 ${HP}; do
+  iptables -t nat -D PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP} 2>/dev/null || true
+  iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP}
+  iptables -I INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || true
+done
+
+# NAT Postrouting Masquerade
+iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -t nat -C POSTROUTING -s 10.0.0.0/8 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -j MASQUERADE
+iptables -t nat -C POSTROUTING -s 172.16.0.0/12 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -j MASQUERADE
+iptables -t nat -C POSTROUTING -s 192.168.0.0/16 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 
 [ -f /opt/hysteria/version ] && cp -f /opt/hysteria/version /etc/ida-version 2>/dev/null || true
