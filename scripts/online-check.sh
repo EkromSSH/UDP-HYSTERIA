@@ -55,7 +55,7 @@ if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null || true
   for bp in 7100 7200 7300; do
     bidx=$(( (bp - 7000) / 100 ))
-    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || grep -q "client-socket-sndbuf 0" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
+    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || ! grep -q "client-socket-sndbuf 0" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
       cat > "/etc/systemd/system/badvpn${bidx}.service" << BV
 [Unit]
 Description=UDP ${bp}
@@ -64,7 +64,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${bp} --max-clients 1000 --max-connections-for-client 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${bp} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0 --udp-mtu 1400
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000

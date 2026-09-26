@@ -39,20 +39,34 @@ chmod +x /opt/hysteria/menu.py /usr/local/bin/online-check.sh /usr/local/bin/sys
 chown -R www-data:www-data /home/vps/public_html/server 2>/dev/null
 
 # Update config: ensure disable_mtu_discovery=true for gaming/UDP stability, low-RAM mobile buffer & resolve_preference=4
+_hyst_changed=0
 for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/config.json /etc/hysteria/config-v1.json; do
   if [ -f "$cfg" ]; then
-    sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
-    if ! grep -q "disable_mtu_discovery" "$cfg" 2>/dev/null; then
-      sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' "$cfg" 2>/dev/null || true
+    if grep -q '"disable_mtu_discovery"[[:space:]]*:[[:space:]]*false' "$cfg" 2>/dev/null || \
+       ! grep -q 'disable_mtu_discovery' "$cfg" 2>/dev/null; then
+      sed -i -E 's/"disable_mtu_discovery"[[:space:]]*:[[:space:]]*(false|true)/"disable_mtu_discovery": true/' "$cfg" 2>/dev/null || true
+      if ! grep -q 'disable_mtu_discovery' "$cfg" 2>/dev/null; then
+        sed -i 's/}$/,\n  "disable_mtu_discovery": true\n}/' "$cfg" 2>/dev/null || true
+      fi
+      _hyst_changed=1
     fi
-    if ! grep -q "resolve_preference" "$cfg" 2>/dev/null; then
+    if ! grep -q 'resolve_preference' "$cfg" 2>/dev/null; then
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
     fi
-    sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
-    sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
+    if grep -q '20971520' "$cfg" 2>/dev/null; then
+      sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
+    fi
+    if grep -q '41943040' "$cfg" 2>/dev/null; then
+      sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
+      _hyst_changed=1
+    fi
   fi
 done
-systemctl restart hysteria 2>/dev/null || true
+if [ "$_hyst_changed" -eq 1 ]; then
+  systemctl restart hysteria 2>/dev/null || true
+fi
 
 # Apply sysctl UDP buffer, conntrack, BBR & ephemeral port optimization
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
@@ -109,7 +123,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0 --udp-mtu 1400
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -121,6 +135,12 @@ EOF
 done
 systemctl daemon-reload 2>/dev/null || true
 systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
+
+# Apply TCP MSS Clamping to prevent packet fragmentation on mobile networks
+iptables -t mangle -C FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+
 echo "v2.3.4" > /etc/ida-version 2>/dev/null || true
 
 # Ensure sysinfo & vnstat-traffic service definitions with [Install] section
