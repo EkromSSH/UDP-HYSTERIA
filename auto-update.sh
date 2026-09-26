@@ -53,15 +53,6 @@ for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/
     if ! grep -q 'resolve_preference' "$cfg" 2>/dev/null; then
       sed -i -E 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
       _hyst_changed=1
-    fi
-    if grep -q '2097152' "$cfg" 2>/dev/null && ! grep -q '20971520' "$cfg" 2>/dev/null; then
-      sed -i -E 's/"recv_window_conn"[[:space:]]*:[[:space:]]*2097152/"recv_window_conn": 10485760/g' "$cfg" 2>/dev/null || true
-      _hyst_changed=1
-    fi
-    if grep -q '8388608' "$cfg" 2>/dev/null; then
-      sed -i -E 's/"recv_window_client"[[:space:]]*:[[:space:]]*8388608/"recv_window_client": 41943040/g' "$cfg" 2>/dev/null || true
-      _hyst_changed=1
-    fi
   fi
 done
 if [ "$_hyst_changed" -eq 1 ]; then

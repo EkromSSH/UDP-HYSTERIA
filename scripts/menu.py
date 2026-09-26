@@ -19,7 +19,16 @@ def get_version():
                     v = f.read().strip()
                     if v: return v
             except: pass
-    return "v2.3.4"
+    return "v2.3.5"
+
+def bump_version(ver_str=None):
+    if not ver_str:
+        ver_str = get_version()
+    m = re.match(r'^(v?)(\d+)\.(\d+)\.(\d+)(.*)$', ver_str.strip())
+    if m:
+        pfx, maj, min_, pat, ext = m.groups()
+        return f"{pfx or 'v'}{maj}.{min_}.{int(pat) + 1}{ext}"
+    return "v2.3.5"
 
 VERSION = get_version()
 
@@ -1438,46 +1447,59 @@ net.ipv6.conf.lo.disable_ipv6 = 1
     except: pass
 
 def update_dashboard():
+    curr_ver = get_version()
+    next_ver = bump_version(curr_ver)
     os.system("clear"); print()
-    box_header("UPDATE SYSTEM & SCRIPTS", "GitHub Sync & Gaming Fixes")
+    box_header("UPDATE SYSTEM & SCRIPTS", "GitHub Sync & Auto Version Bump")
     bput("")
     box_section("UPDATE SPECIFICATION")
     bput("")
-    box_kv("Current Version", get_version(), 16, G)
+    box_kv("Current Version", curr_ver, 16, G)
+    box_kv("Target Version", next_ver, 16, Y)
     box_kv("Target Repo", "EkromSSH/UDP-HYSTERIA", 16)
     box_kv("Gaming Features", "BadVPN 7100/7200/7300, MTU, Sysctl 16MB & BBR", 16, C)
     bput("")
-    box_info("Updating will fetch the latest scripts and apply all game fixes.")
+    box_info(f"Updating will automatically bump version to {next_ver} and apply all latest fixes.")
     bput("")
     box_footer()
     
-    if not ask_confirm("Proceed with system update?"):
+    if not ask_confirm(f"Proceed with update to {next_ver}?"):
         return
         
     os.system("clear"); print()
-    box_header("UPDATING SYSTEM", "Downloading & Applying Fixes")
+    box_header("UPDATING SYSTEM", f"Upgrading to {next_ver}")
     bput("")
-    box_info("Running update script from GitHub repository...")
+    box_info(f"Running update script (Target: {next_ver})...")
     box_info("Applying kernel 16MB UDP buffer, BBR & MTU 1280...")
     box_info("Verifying BadVPN Roblox / Game gateways...")
     bput("")
     box_footer()
     
     try:
-        subprocess.run("curl -fsSL -H 'Cache-Control: no-cache, no-store, must-revalidate' -H 'Pragma: no-cache' 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?v='$(date +%s%N)$RANDOM | bash", shell=True)
+        cmd = f"curl -fsSL -H 'Cache-Control: no-cache, no-store, must-revalidate' -H 'Pragma: no-cache' 'https://raw.githubusercontent.com/EkromSSH/UDP-HYSTERIA/main/update.sh?v='$(date +%s%N)$RANDOM | bash -s -- '{next_ver}'"
+        subprocess.run(f"export NEXT_VERSION='{next_ver}'; {cmd}", shell=True)
     except Exception as e:
         print(f"  {R}Update Error: {e}{NC}")
         
     auto_fix_gaming()
     
+    # Ensure newly bumped version is written to version files
+    for vpath in ["/etc/ida-version", "/opt/hysteria/version"]:
+        try:
+            with open(vpath, "w") as vf:
+                vf.write(next_ver)
+        except:
+            pass
+
     updated_ver = get_version()
     os.system("clear"); print()
     box_header("UPDATE COMPLETED", "System Up to Date")
     bput("")
-    box_success("All scripts and game fixes updated successfully!")
+    box_success(f"All scripts and game fixes updated successfully to {updated_ver}!")
     bput("")
     box_section("SYSTEM STATUS")
     bput("")
+    box_kv("Previous Ver", curr_ver, 16, D)
     box_kv("Current Version", updated_ver, 16, G)
     box_kv("Gaming Gateways", f"{G}[ OK ] 7100/7200/7300 Active{NC}", 16)
     box_kv("Kernel Buffer", f"{G}[ OK ] 16 MB UDP Buffer & BBR{NC}", 16)

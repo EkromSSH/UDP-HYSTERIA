@@ -2,7 +2,28 @@
 # ═══════════════════════════════════════════════════════
 # IDA UDPHysteria — Quick Update & Game Fix
 # ═══════════════════════════════════════════════════════
-VERSION="v2.3.4"
+TARGET_VERSION="${1:-$NEXT_VERSION}"
+if [ -z "$TARGET_VERSION" ]; then
+  CURRENT_VER=""
+  for vpath in /etc/ida-version /opt/hysteria/version; do
+    if [ -f "$vpath" ] && [ -s "$vpath" ]; then
+      CURRENT_VER=$(cat "$vpath" | tr -d '[:space:]')
+      break
+    fi
+  done
+  [ -z "$CURRENT_VER" ] && CURRENT_VER="v2.3.4"
+  if [[ "$CURRENT_VER" =~ ^(v?)([0-9]+)\.([0-9]+)\.([0-9]+)(.*)$ ]]; then
+    P="${BASH_REMATCH[1]}"
+    MAJ="${BASH_REMATCH[2]}"
+    MIN="${BASH_REMATCH[3]}"
+    PAT="${BASH_REMATCH[4]}"
+    EXT="${BASH_REMATCH[5]}"
+    TARGET_VERSION="${P:-v}${MAJ}.${MIN}.$((PAT + 1))${EXT}"
+  else
+    TARGET_VERSION="v2.3.5"
+  fi
+fi
+VERSION="$TARGET_VERSION"
 echo -e "\n\033[1;34m==>\033[0m \033[1;37mUpdating IDA UDPHysteria to ${VERSION} & Applying Network/Game Fixes...\033[0m\n"
 
 # 1. Update MTU, Mobile Buffer & IPv4 Resolve for gaming and mobile connectivity
