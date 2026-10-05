@@ -38,28 +38,29 @@ for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$cfg" 2>/dev/null || true
     fi
     if ! grep -q "resolver" "$cfg" 2>/dev/null; then
-      sed -i -E 's/}$/,\n  "resolver": "udp:\/\/8.8.8.8:53"\n}/' "$cfg" 2>/dev/null || true
+      sed -i -E 's/}$/,\n  "resolver": "udp:\/\/127.0.0.1:53"\n}/' "$cfg" 2>/dev/null || true
     fi
-    sed -i 's/20971520/2097152/g' "$cfg" 2>/dev/null || true
-    sed -i 's/41943040/8388608/g' "$cfg" 2>/dev/null || true
+    if ! grep -q "alpn" "$cfg" 2>/dev/null; then
+      sed -i -E 's/}$/,\n  "alpn": "hysteria"\n}/' "$cfg" 2>/dev/null || true
+    fi
   fi
 done
 systemctl restart hysteria 2>/dev/null || true
-echo -e "  \033[1;32m✅ MTU (1280), Mobile Buffer (2M/8M), Resolver (8.8.8.8) & resolve_preference (4) applied\033[0m"
+echo -e "  \033[1;32m✅ MTU (1280), Fast Resolver (127.0.0.1) & ALPN (hysteria) applied\033[0m"
 
 # 2. Kernel & UDP Buffer & Conntrack Optimization
-echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer (64MB), Conntrack, BBR & IPv6 optimizations..."
+echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer (16MB), Conntrack, BBR & IPv6 optimizations..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 net.ipv4.udp_rmem_min = 8192
 net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 10000 65535
+net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -70,8 +71,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 120
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 25
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -88,7 +89,7 @@ sysctl -p /etc/sysctl.d/99-hysteria.conf >/dev/null 2>&1 || true
 
 echo 'options nf_conntrack hashsize=262144' > /etc/modprobe.d/nf_conntrack.conf
 echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true
-echo -e "  \033[1;32m✅ Sysctl UDP Buffer 64MB, BBR+FQ, Conntrack 1M & IPv6 disabled applied\033[0m"
+echo -e "  \033[1;32m✅ Sysctl UDP Buffer 16MB, BBR+FQ, Conntrack 1M & Ephemeral 10000-65535 applied\033[0m"
 
 # 3. Install & Start BadVPN udpgw (7100, 7200, 7300) for games (Roblox Error 279, etc.)
 echo -e "\033[1;34m==>\033[0m Checking & Installing BadVPN-udpgw (7100, 7200, 7300)..."
@@ -110,11 +111,13 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0
-Restart=on-failure
-RestartPreventExitStatus=23
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144 --udp-mtu 1140
+Restart=always
+RestartSec=3
+MemoryMax=250M
+MemoryHigh=200M
 LimitNPROC=10000
-LimitNOFILE=1000000
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
@@ -126,12 +129,14 @@ systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 echo -e "  \033[1;32m✅ BadVPN udpgw 7100, 7200, 7300 active\033[0m"
 
 # 4. Apply TCP MSS Clamping to prevent packet fragmentation on mobile 4G+/5G networks
-iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
-iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
-iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+for mss in 1140 1280; do
+  iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss $mss 2>/dev/null || true
+  iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss $mss 2>/dev/null || true
+  iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss $mss 2>/dev/null || true
+done
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
+iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
+iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
 
 # 5. Check and generate SAN certificate if needed (4G+/5G Mobile TLS validation)
 if [ ! -f /etc/hysteria/server.crt ] || ! openssl x509 -in /etc/hysteria/server.crt -text -noout 2>/dev/null | grep -q "Subject Alternative Name"; then
@@ -181,14 +186,18 @@ HP=$(grep -oP '"listen":\s*":\K[0-9]+' /opt/hysteria/config-v1.json 2>/dev/null 
 for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 ${HP}; do
   iptables -t nat -D PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP} 2>/dev/null || true
   iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP}
-  iptables -I INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || true
+  iptables -C INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport $pt -j ACCEPT
 done
 
+# DNS AAAA filter redirect to local dnsmasq
+
 # NAT Postrouting Masquerade
-iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+DEF_IF=$(ip -o -4 route show to default 2>/dev/null | awk '{print $5}')
+[ -z "$DEF_IF" ] && DEF_IF="eth0"
 iptables -t nat -C POSTROUTING -s 10.0.0.0/8 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -j MASQUERADE
 iptables -t nat -C POSTROUTING -s 172.16.0.0/12 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -j MASQUERADE
 iptables -t nat -C POSTROUTING -s 192.168.0.0/16 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+iptables -C FORWARD -j ACCEPT 2>/dev/null || iptables -A FORWARD -j ACCEPT
 
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 

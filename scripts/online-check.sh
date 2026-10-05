@@ -23,12 +23,8 @@ for _cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria
       sed -i 's/}$/,\n  "resolve_preference": "4"\n}/' "$_cfg" 2>/dev/null || true
       _changed=1
     fi
-    if grep -q '20971520' "$_cfg" 2>/dev/null; then
-      sed -i 's/20971520/2097152/g' "$_cfg" 2>/dev/null || true
-      _changed=1
-    fi
-    if grep -q '41943040' "$_cfg" 2>/dev/null; then
-      sed -i 's/41943040/8388608/g' "$_cfg" 2>/dev/null || true
+    if ! grep -q 'alpn' "$_cfg" 2>/dev/null; then
+      sed -i 's/}$/,\n  "alpn": "hysteria"\n}/' "$_cfg" 2>/dev/null || true
       _changed=1
     fi
     if [ "$_changed" -eq 1 ]; then
@@ -46,6 +42,11 @@ for _srv in vnstat-traffic sysinfo; do
   fi
 done
 
+mem_badvpn=$(ps -C badvpn -o rss= 2>/dev/null | sort -nr | head -n1 || echo 0)
+if [ "${mem_badvpn:-0}" -gt 200000 ]; then
+  systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null || true
+fi
+
 if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   if [ ! -f /usr/sbin/badvpn ] || [ ! -s /usr/sbin/badvpn ]; then
     wget -q -O /usr/sbin/badvpn "https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn" 2>/dev/null || \
@@ -55,7 +56,7 @@ if ! systemctl is-active --quiet badvpn3 2>/dev/null; then
   rm -f /etc/systemd/system/badvpn101.service /etc/systemd/system/badvpn201.service 2>/dev/null || true
   for bp in 7100 7200 7300; do
     bidx=$(( (bp - 7000) / 100 ))
-    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || ! grep -q "client-socket-sndbuf 0" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
+    if [ ! -f "/etc/systemd/system/badvpn${bidx}.service" ] || ! grep -q "client-socket-sndbuf 262144" "/etc/systemd/system/badvpn${bidx}.service" 2>/dev/null; then
       cat > "/etc/systemd/system/badvpn${bidx}.service" << BV
 [Unit]
 Description=UDP ${bp}
@@ -64,11 +65,13 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${bp} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0
-Restart=on-failure
-RestartPreventExitStatus=23
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${bp} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144
+Restart=always
+RestartSec=3
+MemoryMax=250M
+MemoryHigh=200M
 LimitNPROC=10000
-LimitNOFILE=1000000
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
@@ -79,16 +82,18 @@ BV
   systemctl enable --now badvpn1 badvpn2 badvpn3 2>/dev/null || true
 fi
 
-if [ ! -f /etc/sysctl.d/99-hysteria.conf ] || ! grep -q "rmem_max = 16777216" /etc/sysctl.d/99-hysteria.conf 2>/dev/null; then
+if [ ! -f /etc/sysctl.d/99-hysteria.conf ] || ! grep -q "1024 9999" /etc/sysctl.d/99-hysteria.conf 2>/dev/null; then
   cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 net.core.rmem_default = 4194304
 net.core.wmem_default = 4194304
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
 
-# Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 10000 65535
+# Ephemeral port range for outbound connections (prevents port exhaustion & collision with port hopping)
+net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -97,10 +102,10 @@ net.ipv4.ip_forward = 1
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
-# Conntrack tuning for High-Volume UDP Port Hopping & VPN
+# Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 60
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 25
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -108,7 +113,7 @@ net.netfilter.nf_conntrack_tcp_timeout_time_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_recv = 10
 net.netfilter.nf_conntrack_tcp_timeout_syn_sent = 10
 
-# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts)
+# Disable IPv6 since VPS has no IPv6 routing (prevents IPv6 blackhole / timeouts on 5G)
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1

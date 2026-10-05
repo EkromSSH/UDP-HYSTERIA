@@ -960,7 +960,7 @@ def change_port():
         for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(chosen_port)]:
             subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port} 2>/dev/null", shell=True)
             subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port}", shell=True)
-            subprocess.run(f"iptables -I INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null", shell=True)
+            subprocess.run(f"iptables -C INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport {pt} -j ACCEPT", shell=True)
         subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
 
         # Update /etc/showon.conf
@@ -1388,6 +1388,9 @@ def auto_fix_gaming():
                 if '41943040' in content:
                     content = content.replace('41943040', '8388608')
                     changed = True
+                if '"alpn"' not in content:
+                    content = content.rstrip().rstrip('}') + ',\n  "alpn": "hysteria"\n}'
+                    changed = True
                 if changed:
                     with open(cfg, 'w') as f: f.write(content)
                     subprocess.run("systemctl restart hysteria 2>/dev/null", shell=True)
@@ -1400,7 +1403,7 @@ def auto_fix_gaming():
             need_badvpn_update = True
         elif os.path.exists("/etc/systemd/system/badvpn1.service"):
             with open("/etc/systemd/system/badvpn1.service", "r") as bf:
-                if "client-socket-sndbuf 0" not in bf.read():
+                if "client-socket-sndbuf 262144" not in bf.read():
                     need_badvpn_update = True
 
         if need_badvpn_update:
@@ -1408,22 +1411,22 @@ def auto_fix_gaming():
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0\nRestart=on-failure\nRestartPreventExitStatus=23\nLimitNPROC=10000\nLimitNOFILE=1000000\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144 --udp-mtu 1140\nRestart=always\nRestartSec=3\nMemoryMax=250M\nMemoryHigh=200M\nLimitNPROC=10000\nLimitNOFILE=65535\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass
 
     try:
         cfg = """# UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 net.ipv4.udp_rmem_min = 8192
 net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 10000 65535
+net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -1434,8 +1437,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 120
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 25
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -1454,25 +1457,33 @@ net.ipv6.conf.lo.disable_ipv6 = 1
         subprocess.run("echo 262144 > /sys/module/nf_conntrack/parameters/hashsize 2>/dev/null || true", shell=True)
 
         # Apply TCP MSS Clamping to prevent packet fragmentation on mobile 4G+/5G networks
-        subprocess.run("iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
-        subprocess.run("iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
-        subprocess.run("iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true", shell=True)
-        subprocess.run("iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
-        subprocess.run("iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
-        subprocess.run("iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280", shell=True)
+        for mss in ["1140", "1280"]:
+            subprocess.run(f"iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss {mss} 2>/dev/null || true", shell=True)
+            subprocess.run(f"iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss {mss} 2>/dev/null || true", shell=True)
+            subprocess.run(f"iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss {mss} 2>/dev/null || true", shell=True)
+        subprocess.run("iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140", shell=True)
+        subprocess.run("iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140", shell=True)
+        subprocess.run("iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140", shell=True)
 
         # Redirect all mobile 4G+/5G UDP ports to Hysteria listen port
         hp, _, _ = read_config()
         for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(hp)]:
             subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp} 2>/dev/null", shell=True)
             subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp}", shell=True)
-            subprocess.run(f"iptables -I INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null", shell=True)
+            subprocess.run(f"iptables -C INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport {pt} -j ACCEPT", shell=True)
+
+        # DNS AAAA filter redirect to local dnsmasq
 
         # NAT Postrouting Masquerade
-        subprocess.run("iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE", shell=True)
+        def_if = "eth0"
+        try:
+            r = subprocess.run("ip -o -4 route show to default 2>/dev/null | awk '{print $5}'", shell=True, capture_output=True, text=True)
+            if r.stdout.strip(): def_if = r.stdout.strip()
+        except: pass
         subprocess.run("iptables -t nat -C POSTROUTING -s 10.0.0.0/8 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -j MASQUERADE", shell=True)
         subprocess.run("iptables -t nat -C POSTROUTING -s 172.16.0.0/12 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -j MASQUERADE", shell=True)
         subprocess.run("iptables -t nat -C POSTROUTING -s 192.168.0.0/16 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE", shell=True)
+        subprocess.run("iptables -C FORWARD -j ACCEPT 2>/dev/null || iptables -A FORWARD -j ACCEPT", shell=True)
         subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
     except: pass
 

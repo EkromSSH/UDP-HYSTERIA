@@ -70,6 +70,7 @@ cat > /opt/hysteria/config-v1.json << EOF
   "key": "/etc/hysteria/server.key",
   "up_mbps": 100,
   "down_mbps": 100,
+  "alpn": "hysteria",
   "obfs": "${OBFS}",
   "auth_str": "${AUTH}",
   "auth": {
@@ -79,7 +80,7 @@ cat > /opt/hysteria/config-v1.json << EOF
       "${AUTH}:${AUTH}"
     ]
   },
-  "resolver": "udp://8.8.8.8:53",
+  "resolver": "udp://127.0.0.1:53",
   "resolve_preference": "4",
   "disable_mtu_discovery": true,
   "recv_window_conn": 2097152,
@@ -111,15 +112,15 @@ EOF
 echo -e "\n\033[1;34m==>\033[0m Optimizing system UDP buffers & network for 4G+/5G..."
 cat > /etc/sysctl.d/99-hysteria.conf << 'EOF'
 # UDP Buffer Optimization for QUIC / Hysteria & High Throughput
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.rmem_default = 8388608
-net.core.wmem_default = 8388608
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.core.rmem_default = 4194304
+net.core.wmem_default = 4194304
 net.ipv4.udp_rmem_min = 8192
 net.ipv4.udp_wmem_min = 8192
 
 # Ephemeral port range for outbound connections (prevents port exhaustion)
-net.ipv4.ip_local_port_range = 10000 65535
+net.ipv4.ip_local_port_range = 1024 9999
 
 # Enable IP forwarding
 net.ipv4.ip_forward = 1
@@ -130,8 +131,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 120
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 25
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -163,11 +164,13 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 1000 --max-connections-for-client 500 --client-socket-sndbuf 0
-Restart=on-failure
-RestartPreventExitStatus=23
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144 --udp-mtu 1140
+Restart=always
+RestartSec=3
+MemoryMax=250M
+MemoryHigh=200M
 LimitNPROC=10000
-LimitNOFILE=1000000
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
@@ -176,22 +179,31 @@ EOF
   systemctl enable --now badvpn${idx} 2>/dev/null || true
 done
 
-# ══ Port hopping & TCP MSS 1280 Clamping ══
-echo -e "\n\033[1;34m==>\033[0m Setting up port hopping & TCP MSS Clamping (1280)..."
-iptables -t nat -D PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port ${PORT} 2>/dev/null || true
-iptables -t nat -D PREROUTING -p udp --dport ${PORT} -j REDIRECT --to-port ${PORT} 2>/dev/null || true
-iptables -t nat -A PREROUTING -p udp --dport 10000:65000 -j REDIRECT --to-port ${PORT}
-iptables -t nat -A PREROUTING -p udp --dport ${PORT} -j REDIRECT --to-port ${PORT}
-iptables -I INPUT -p udp --dport ${PORT} -j ACCEPT 2>/dev/null || true
-iptables -I INPUT -p udp --dport 10000:65000 -j ACCEPT 2>/dev/null || true
+# ══ Port hopping, Mobile Ports & TCP MSS 1280 Clamping ══
+echo -e "\n\033[1;34m==>\033[0m Setting up port hopping & mobile 4G+/5G bypass..."
+for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 ${PORT}; do
+  iptables -t nat -D PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${PORT} 2>/dev/null || true
+  iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${PORT}
+  iptables -C INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport $pt -j ACCEPT
+done
+
+# DNS AAAA filter redirect to local dnsmasq
+
+# NAT Postrouting Masquerade
+DEF_IF=$(ip -o -4 route show to default 2>/dev/null | awk '{print $5}')
+[ -z "$DEF_IF" ] && DEF_IF="eth0"
+iptables -t nat -C POSTROUTING -s 10.0.0.0/8 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 10.0.0.0/8 -j MASQUERADE
+iptables -t nat -C POSTROUTING -s 172.16.0.0/12 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 172.16.0.0/12 -j MASQUERADE
+iptables -t nat -C POSTROUTING -s 192.168.0.0/16 -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+iptables -C FORWARD -j ACCEPT 2>/dev/null || iptables -A FORWARD -j ACCEPT
 
 # TCP MSS Clamping to 1280 to prevent MTU GTP tunnel drop on 4G+/5G
-iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280 2>/dev/null || true
-iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
-iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
-iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1280
+iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140 2>/dev/null || true
+iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140 2>/dev/null || true
+iptables -t mangle -D POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140 2>/dev/null || true
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
+iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
+iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1140
 iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 
 systemctl daemon-reload && systemctl enable hysteria && systemctl restart hysteria
