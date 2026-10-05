@@ -45,8 +45,22 @@ for cfg in /opt/hysteria/config-v1.json /opt/hysteria/config.json /etc/hysteria/
     fi
   fi
 done
+if [ -f /usr/local/bin/hysteria ]; then
+  python3 -c '
+bin_path = "/usr/local/bin/hysteria"
+with open(bin_path, "rb") as f:
+    data = bytearray(f.read())
+pattern = bytes.fromhex("48 89 44 24 08 48 89 5c 24 10 48 8d 0d 3f ef 7d 00")
+patched_start = bytes.fromhex("b8 b0 04 00 00 c3")
+pos = data.find(pattern)
+if pos != -1:
+    data[pos:pos+6] = patched_start
+    with open(bin_path, "wb") as f:
+        f.write(data)
+' 2>/dev/null || true
+fi
 systemctl restart hysteria 2>/dev/null || true
-echo -e "  \033[1;32m✅ MTU (1280), Fast Resolver (127.0.0.1) & ALPN (hysteria) applied\033[0m"
+echo -e "  \033[1;32m✅ MTU (1200/1280), Fast Resolver (127.0.0.1) & ALPN (hysteria) applied\033[0m"
 
 # 2. Kernel & UDP Buffer & Conntrack Optimization
 echo -e "\033[1;34m==>\033[0m Applying Kernel UDP buffer (16MB), Conntrack, BBR & IPv6 optimizations..."

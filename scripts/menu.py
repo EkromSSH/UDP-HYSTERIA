@@ -359,7 +359,7 @@ def show_info():
             down = _d.get("down_mbps", 50)
     except: pass
     link_443 = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-443-Mobile"
-    link_hop = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=443,80,8443,2053,2083,2087,2096,8880,10000-65000&retry=3#Hysteria-PortHop"
+    link_hop = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=443,80,8443,2053,2083,2087,2096,8880,10000-65000&hop_interval=30&retry=3#Hysteria-PortHop"
     link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-Direct"
     
     os.system("clear"); print()
