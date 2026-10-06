@@ -956,10 +956,10 @@ def change_port():
         d["listen"] = f"{d.get('listen',':25000').rsplit(':',1)[0]}:{chosen_port}"
         with open(HYST_CONFIG, 'w') as f: json.dump(d, f, indent=2)
 
-        # Update iptables NAT PREROUTING and INPUT rules for all mobile ports
-        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(chosen_port)]:
+        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", "36712"]:
             subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port} 2>/dev/null", shell=True)
-            subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port}", shell=True)
+            if pt != str(chosen_port):
+                subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {chosen_port}", shell=True)
             subprocess.run(f"iptables -C INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport {pt} -j ACCEPT", shell=True)
         subprocess.run("iptables-save > /etc/iptables/rules.v4 2>/dev/null || true", shell=True)
 
@@ -1467,9 +1467,10 @@ net.ipv6.conf.lo.disable_ipv6 = 1
 
         # Redirect all mobile 4G+/5G UDP ports to Hysteria listen port
         hp, _, _ = read_config()
-        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", str(hp)]:
+        for pt in ["443", "80", "8443", "8880", "2053", "2083", "2087", "2096", "10000:65000", "36712"]:
             subprocess.run(f"iptables -t nat -D PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp} 2>/dev/null", shell=True)
-            subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp}", shell=True)
+            if pt != str(hp):
+                subprocess.run(f"iptables -t nat -A PREROUTING -p udp --dport {pt} -j REDIRECT --to-port {hp}", shell=True)
             subprocess.run(f"iptables -C INPUT -p udp --dport {pt} -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport {pt} -j ACCEPT", shell=True)
 
         # DNS AAAA filter redirect to local dnsmasq
