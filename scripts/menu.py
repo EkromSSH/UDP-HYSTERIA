@@ -359,7 +359,7 @@ def show_info():
             down = _d.get("down_mbps", 50)
     except: pass
     link_443 = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-443-Mobile"
-    link_hop = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=443,80,8443,2053,2083,2087,2096,8880,10000-65000&hop_interval=30&retry=3#Hysteria-PortHop"
+    link_hop = f"hysteria://{ip}:443?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&mport=10000-65000&hop_interval=30&retry=3#Hysteria-PortHop"
     link_direct = f"hysteria://{ip}:{p}?protocol=udp&auth={a}&obfs={o}&peer={ip}&insecure=1&upmbps={up}&downmbps={down}&alpn=hysteria&retry=3#Hysteria-Direct"
     
     os.system("clear"); print()
@@ -1411,7 +1411,7 @@ def auto_fix_gaming():
             subprocess.run("command -v /usr/sbin/badvpn >/dev/null 2>&1 || (wget -q -O /usr/sbin/badvpn https://raw.githubusercontent.com/EkromSSH/VPN/main/badvpn/badvpn && chmod +x /usr/sbin/badvpn)", shell=True)
             for p in [7100, 7200, 7300]:
                 idx = (p - 7000) // 100
-                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144 --udp-mtu 1140\nRestart=always\nRestartSec=3\nMemoryMax=250M\nMemoryHigh=200M\nLimitNPROC=10000\nLimitNOFILE=65535\n\n[Install]\nWantedBy=multi-user.target\n"
+                svc = f"[Unit]\nDescription=UDP {p}\nAfter=syslog.target network-online.target\n\n[Service]\nUser=root\nNoNewPrivileges=true\nExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:{p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144\nRestart=always\nRestartSec=3\nMemoryMax=250M\nMemoryHigh=200M\nLimitNPROC=10000\nLimitNOFILE=65535\n\n[Install]\nWantedBy=multi-user.target\n"
                 with open(f"/etc/systemd/system/badvpn{idx}.service", "w") as f: f.write(svc)
             subprocess.run("systemctl daemon-reload && systemctl restart badvpn1 badvpn2 badvpn3 2>/dev/null", shell=True)
     except: pass

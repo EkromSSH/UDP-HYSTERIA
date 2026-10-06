@@ -164,7 +164,7 @@ After=syslog.target network-online.target
 [Service]
 User=root
 NoNewPrivileges=true
-ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144 --udp-mtu 1140
+ExecStart=/usr/sbin/badvpn --listen-addr 127.0.0.1:${p} --max-clients 250 --max-connections-for-client 100 --client-socket-sndbuf 262144
 Restart=always
 RestartSec=3
 MemoryMax=250M
