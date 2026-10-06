@@ -148,8 +148,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 1
-net.netfilter.nf_conntrack_udp_timeout_stream = 2
+net.netfilter.nf_conntrack_udp_timeout = 3
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
