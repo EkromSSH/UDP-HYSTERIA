@@ -48,9 +48,13 @@ pattern = bytes.fromhex("48 89 44 24 08 48 89 5c 24 10 48 8d 0d 3f ef 7d 00")
 patched_start = bytes.fromhex("b8 b0 04 00 00 c3")
 pos = data.find(pattern)
 if pos != -1:
+    import os
+    tmp_path = "/usr/local/bin/hysteria.tmp"
     data[pos:pos+6] = patched_start
-    with open(bin_path, "wb") as f:
+    with open(tmp_path, "wb") as f:
         f.write(data)
+    os.chmod(tmp_path, 0o755)
+    os.replace(tmp_path, bin_path)
 ' 2>/dev/null || true
 fi
 
@@ -114,8 +118,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 10
-net.netfilter.nf_conntrack_udp_timeout_stream = 25
+net.netfilter.nf_conntrack_udp_timeout = 30
+net.netfilter.nf_conntrack_udp_timeout_stream = 120
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10

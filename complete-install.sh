@@ -21,6 +21,23 @@ apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--fo
 echo -e "\n\033[1;34m==>\033[0m Downloading Hysteria v1.3.5..."
 wget -q https://github.com/apernet/hysteria/releases/download/v1.3.5/hysteria-linux-amd64 -O /usr/local/bin/hysteria
 chmod +x /usr/local/bin/hysteria
+# Patch Hysteria binary for MTU 1200 (1244 on wire) for 3G/H+/4G/5G mobile stability
+python3 -c '
+import os
+bin_path = "/usr/local/bin/hysteria"
+tmp_path = "/usr/local/bin/hysteria.tmp"
+with open(bin_path, "rb") as f:
+    data = bytearray(f.read())
+pattern = bytes.fromhex("48 89 44 24 08 48 89 5c 24 10 48 8d 0d 3f ef 7d 00")
+patched_start = bytes.fromhex("b8 b0 04 00 00 c3")
+pos = data.find(pattern)
+if pos != -1:
+    data[pos:pos+6] = patched_start
+    with open(tmp_path, "wb") as f:
+        f.write(data)
+    os.chmod(tmp_path, 0o755)
+    os.replace(tmp_path, bin_path)
+' 2>/dev/null || true
 mkdir -p /etc/hysteria /home/vps/public_html/server
 
 # ══ Generate certificates (with SAN for 4G+/5G Mobile / Android / iOS / Go TLS) ══
