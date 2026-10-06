@@ -118,8 +118,8 @@ net.ipv4.tcp_congestion_control = bbr
 
 # Conntrack tuning for High-Volume UDP Port Hopping & 4G/5G mobile CGNAT
 net.netfilter.nf_conntrack_max = 1048576
-net.netfilter.nf_conntrack_udp_timeout = 30
-net.netfilter.nf_conntrack_udp_timeout_stream = 120
+net.netfilter.nf_conntrack_udp_timeout = 10
+net.netfilter.nf_conntrack_udp_timeout_stream = 30
 net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 10
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 10
@@ -220,10 +220,12 @@ CERTEOF
 fi
 
 # Redirect all mobile 4G+/5G UDP ports to Hysteria listen port
-HP=$(grep -oP '"listen":\s*":\K[0-9]+' /opt/hysteria/config-v1.json 2>/dev/null || echo 36712)
-for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 ${HP}; do
+HP=$(grep -oP '"listen":\s*":\K[0-9]+' /opt/hysteria/config-v1.json 2>/dev/null || echo 443)
+for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 36712; do
   iptables -t nat -D PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP} 2>/dev/null || true
-  iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP}
+  if [ "$pt" != "$HP" ]; then
+    iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${HP}
+  fi
   iptables -C INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport $pt -j ACCEPT
 done
 
