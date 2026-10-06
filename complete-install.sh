@@ -198,9 +198,11 @@ done
 
 # ══ Port hopping, Mobile Ports & TCP MSS 1280 Clamping ══
 echo -e "\n\033[1;34m==>\033[0m Setting up port hopping & mobile 4G+/5G bypass..."
-for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 ${PORT}; do
+for pt in 443 80 8443 8880 2053 2083 2087 2096 10000:65000 36712; do
   iptables -t nat -D PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${PORT} 2>/dev/null || true
-  iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${PORT}
+  if [ "$pt" != "${PORT}" ]; then
+    iptables -t nat -A PREROUTING -p udp --dport $pt -j REDIRECT --to-port ${PORT}
+  fi
   iptables -C INPUT -p udp --dport $pt -j ACCEPT 2>/dev/null || iptables -A INPUT -p udp --dport $pt -j ACCEPT
 done
 
